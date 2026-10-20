@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- VMX World mockup: the Xbox disc's TV screens. See ../docs/DESIGN.md. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VMX World</title>
+<style>
+/* the look follows FOLD BUILDER (black void, green grid, slanted tabs, brushed metal) and the VMX's own green */
+:root { --phos: #7dff3a; --green: #2f6b1f; --ink: #e6efe0; --mute: #8a9886; --line: #c9cfc6; --panel: rgba(8, 14, 8, .82);
+  --a: #34c759; --b: #e2392f; color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+body { display: grid; place-items: center; font: 13px/1.35 "Trebuchet MS", "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+#tv { --k: 1; position: relative; width: 640px; height: 480px; transform: scale(var(--k)); transform-origin: center;
+  background: #000; overflow: hidden; flex: none; image-rendering: auto; }
+/* the floor grid, drifting slowly */
+#tv::before { content: ""; position: absolute; left: -50%; right: -50%; top: 46%; height: 120%;
+  background: linear-gradient(rgba(125,255,58,.16) 1px, transparent 1px) 0 0 / 48px 48px,
+              linear-gradient(90deg, rgba(125,255,58,.16) 1px, transparent 1px) 0 0 / 48px 48px;
+  transform: perspective(300px) rotateX(62deg); transform-origin: top; animation: drift 6s linear infinite;
+  mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); -webkit-mask-image: linear-gradient(transparent, #000 30%); }
+@keyframes drift { to { background-position: 0 48px, 0 48px; } }
+@media (prefers-reduced-motion: reduce) { #tv::before { animation: none; } }
+
+header { position: absolute; left: 0; right: 0; top: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.mark { font-weight: 800; letter-spacing: .24em; font-size: 15px; color: var(--ink); }
+.mark i { font-style: normal; color: var(--phos); text-shadow: 0 0 8px rgba(125,255,58,.6); }
+#vmxstat { font-size: 10px; letter-spacing: .12em; color: var(--mute); display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--phos); box-shadow: 0 0 6px var(--phos); display: inline-block; }
+.dot.off { background: #444; box-shadow: none; }
+
+/* slanted tabs between two rules, as FOLD BUILDER's */
+#tabs { position: absolute; left: 0; right: 0; top: 46px; height: 30px; display: flex; gap: 3px; padding: 3px 4px;
+  border-top: 2px solid var(--line); border-bottom: 2px solid var(--line); box-sizing: border-box; }
+.tab { flex: 1; display: grid; place-items: center; font-size: 10.5px; letter-spacing: .1em; color: var(--ink); cursor: pointer; position: relative; }
+.tab::before { content: ""; position: absolute; inset: 0; border-right: 2px solid #9aa196; transform: skewX(-28deg); }
+.tab span { position: relative; }
+.tab.on::before { background: var(--green); }
+.tab.focus::before { background: #3f8f27; box-shadow: 0 0 0 1px var(--phos), 0 0 12px rgba(125,255,58,.45); }
+
+.body { position: absolute; left: 12px; right: 12px; top: 88px; bottom: 40px; display: flex; gap: 12px; }
+.panel { background: var(--panel); border: 1px solid #39443a; border-radius: 6px; padding: 10px; box-sizing: border-box; overflow: hidden; }
+.left { width: 228px; flex: none; }
+.right { flex: 1; min-width: 0; }
+.col { flex: 1; min-width: 0; }
+.col.cur { border-color: var(--phos); }
+.active .col:not(.cur) .row.sel { background: rgba(63,143,39,.18); border-color: transparent; box-shadow: none; }
+h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: .04em; }
+h3 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: .14em; color: var(--mute); font-weight: 700; }
+small { color: var(--mute); font-size: 10px; letter-spacing: .06em; }
+p { margin: 8px 0; color: #cfd9ca; }
+.empty { color: var(--mute); font-size: 11px; letter-spacing: .08em; }
+.list { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.panel.left, .panel.col { display: flex; flex-direction: column; }
+.list::-webkit-scrollbar { display: none; }
+.row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 4px; min-height: 22px; cursor: pointer; border: 1px solid transparent; }
+.row span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; letter-spacing: .04em; font-size: 12px; }
+.row small { flex: none; }
+.row img { width: 24px; height: 24px; image-rendering: pixelated; background: #041004; border-radius: 3px; padding: 2px; }
+.row.sel { background: rgba(63,143,39,.28); border-color: rgba(125,255,58,.35); }
+.active .row.sel { background: var(--green); border-color: var(--phos); box-shadow: 0 0 10px rgba(125,255,58,.3); }
+.t0 .row { flex-direction: column; align-items: flex-start; gap: 0; }
+.st { color: var(--phos); }
+.article h2 { margin-top: 4px; }
+.hero { display: flex; gap: 12px; align-items: center; }
+.hero img { width: 120px; height: 120px; image-rendering: pixelated; background: #041004; border-radius: 6px; padding: 8px; border: 1px solid #2c3a2b; }
+.badge { display: inline-block; margin-top: 8px; font-size: 10px; letter-spacing: .1em; padding: 3px 8px; border-radius: 999px; background: #20301b; color: var(--phos); border: 1px solid #3f6b2b; }
+/* the action button: a brushed-metal plate, as the builder's panels */
+.act { margin-top: 10px; display: inline-block; padding: 8px 14px; border-radius: 6px; font-weight: 800; letter-spacing: .1em; font-size: 11px; color: #1a1f19;
+  background: url(img/metal.png) center / cover; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 6px rgba(0,0,0,.6); }
+.act.focus { outline: 2px solid var(--phos); outline-offset: 2px; }
+.bar { height: 10px; background: #102010; border-radius: 5px; overflow: hidden; margin: 10px 0 4px; border: 1px solid #2c3a2b; }
+.bar i { display: block; height: 100%; background: var(--phos); box-shadow: 0 0 8px var(--phos); }
+.bar.small { height: 6px; margin: 0 0 3px; }
+.blk { display: block; margin-bottom: 8px; }
+.stage { display: grid; place-items: center; }
+.device { position: relative; width: 402px; height: 307px; background: url(img/vmx-head.png) no-repeat; transform: scale(.88); flex: none; }
+.device canvas { position: absolute; left: 105px; top: 89px; width: 192px; height: 192px; image-rendering: pixelated; }
+.sc .rec { display: flex; gap: 14px; margin: 6px 0 12px; flex-wrap: wrap; }
+.sc .rec div { display: grid; }
+.sc .rec b { font-size: 18px; color: var(--phos); font-variant-numeric: tabular-nums; }
+.sc .rec b.new { color: #ffd34a; font-size: 13px; }
+.nat { margin: 0; padding: 0 0 0 20px; display: grid; gap: 1px; font-size: 12px; }
+.nat li { padding: 1px 4px; }
+.nat li span { display: inline-block; width: 120px; }
+.nat li b { font-variant-numeric: tabular-nums; }
+.nat li.you { background: var(--green); border-radius: 3px; }
+.note { display: block; margin-top: 6px; }
+.shot { height: 150px; aspect-ratio: 4 / 3; border-radius: 4px; background: #000 0 0 / 200% 100% no-repeat; border: 1px solid #2c3a2b; }
+
+footer { position: absolute; z-index: 2; left: 12px; right: 12px; bottom: 8px; height: 24px; display: flex; gap: 18px; align-items: center; justify-content: flex-end; font-size: 10px; letter-spacing: .1em; color: var(--mute); }
+.h { display: flex; align-items: center; gap: 5px; }
+.k { display: inline-grid; place-items: center; min-width: 16px; height: 16px; border-radius: 50%; font-size: 9px; color: #fff; font-weight: 800; }
+.kA { background: var(--a); } .kB { background: var(--b); }
+.kLR, .kBK { border-radius: 8px; padding: 0 5px; background: #333; color: #ddd; }
+.toast { position: absolute; left: 50%; bottom: 46px; transform: translate(-50%, 20px); opacity: 0; transition: .2s; background: #111d10; border: 1px solid var(--phos);
+  color: var(--phos); padding: 6px 14px; border-radius: 999px; font-size: 11px; letter-spacing: .12em; font-weight: 700; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+#overlay:empty { display: none; }
+#overlay { position: absolute; inset: 0; background: rgba(0,0,0,.8); display: grid; place-items: center; }
+.menu { min-width: 260px; background: #0b130b; border: 1px solid var(--phos); border-radius: 8px; padding: 12px; display: grid; gap: 3px; }
+.menu .row.sel { background: var(--green); border-color: var(--phos); }
+.applet { width: 600px; text-align: center; }
+.shot.big { height: 300px; width: 400px; margin: 0 auto; background-size: 200% 100%; }
+.call { width: 600px; box-sizing: border-box; padding: 14px; background: #060c06; border: 1px solid #39443a; border-radius: 8px; display: grid; grid-template-columns: 290px 1fr; grid-template-rows: auto auto 1fr auto; column-gap: 14px; align-items: start; }
+#callvmx { grid-row: 1 / 5; }
+#callvmx { width: 290px; height: 222px; overflow: hidden; }
+#callvmx .device { transform: scale(.72); transform-origin: top left; }
+.call h3 { color: var(--phos); }
+.call canvas#scope { width: 270px; height: 54px; border: 1px solid #2c3a2b; border-radius: 4px; }
+.call ol { margin: 8px 0; padding-left: 18px; font-size: 11px; letter-spacing: .06em; color: var(--mute); }
+.call li.done { color: var(--ink); } .call li.done::marker { color: var(--phos); }
+.call li.now { color: var(--phos); font-weight: 700; }
+.code b { color: var(--phos); font-size: 15px; }
+.call p { grid-column: 2; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div id="tv">
+  <header><div class="mark">VMX <i>WORLD</i></div><div id="vmxstat"></div></header>
+  <nav id="tabs"></nav>
+  <main id="body" class="body"></main>
+  <footer id="hints"></footer>
+  <div id="toast" class="toast"></div>
+  <div id="overlay"></div>
+</div>
+<script type="module" src="world.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# VMX World: status
+
+Read `docs/DESIGN.md` first: it is the plan (the 2002 story, the save layout, GAME.VXP, the score record, the
+phone call, the World disc's tabs, the open question about the program format).
+
+## 2026-10-20: design + TV mockup
+
+Owner's brief (chat, 2026-10-20): an Xbox-side downloader / installer / launcher for VMX games; games from retail
+discs (PocketStation/VMU style) or downloads; downloads can bring Xbox-side code (the FOLD builder); game data and
+saves under one "VMX World" title; games can read other games' saves; a simulator, leaderboards and news; scores in
+a standard record (title ID, score, fields 1-3) sent in bulk over a dial-up call to an 1-800 number from the VMX's
+main menu; retail games carry a small World; World gets applets for retail games.
+
+Done:
+- `docs/DESIGN.md`. My choices there are marked (proposed). The main ones: the VMX is a memory unit, so a VMX
+  game is a save of title `56580001` ("VX" publisher letters, unused by real games); the "???" main-menu pill
+  becomes CALL; the call is one-way (DTMF dial, then Bell 202 sent 3 times, then a voice reads a check code back),
+  because the VMX's mic and beeper are both at its top and can't reach both ends of a handset; for today a phone
+  web page decodes the tones instead of a real 1-800 line; programs recommended as WebAssembly ("VMX byte code").
+- `mockup/modem.js`: score records (20 bytes, CRC-16), the call message, the call's sound (square-wave beeper or
+  sine), a fake phone line (300-3400 Hz, 8 kHz mu-law, noise) and a decoder.
+  `node tools/modem_test.mjs` passes: 30 records decode through clean, normal, noisy and quiet lines.
+- `mockup/world.html` + `world.js`: the World disc's TV screen, 640 x 480, styled after FOLD BUILDER (green grid,
+  slanted tabs, brushed metal from fold/assets/metal.rgb, the VMX head render from fold/assets/vmx_large.rgba).
+  Tabs: NEWS, GET GAMES (made-up downloads to the "hard disk"), MY VMX (hard disk vs the VMX in controller 1, blocks,
+  install / remove / copy), PLAY (the real game cores on the VMX head, pad or keyboard), SCORES (your records, a
+  made-up national top 5, CALL IN: plays the real call sound, decodes it through the fake line, shows the voice's
+  code against the VMX's), APPLETS (FOLD BUILDER: a picture of the real builder; a retail-applet placeholder).
+  Keys: arrows, Z/Enter = A, X/Esc = B, Q/E = triggers (tabs), Backspace = BACK (quits a game), V = plug/unplug the
+  VMX. Pads: standard Gamepad mapping. `?debug` exposes `window.WORLD`. State is in localStorage `vmx-world`.
+- `tools/sync.sh` copies the game adapters/cores from Pocket Arcade's `vmx/` and FOLD ROOMS from microgames into
+  `mockup/vmx/` (never edit those copies) and converts the two FOLD assets. Preview config: "vmx-world" (port 8799).
+
+Not done / next (DESIGN.md "Building it"):
+1. `tools/vxp.py` (pack/unpack GAME.VXP) and the score record in C, with shared test files.
+2. The modem in C (VMX encoder) and the phone page (mic decoder in JS).
+3. World on the Xbox (nxdk), reusing FOLD's renderer and test tools; FOLD BUILDER as the first applet.
+4. The VMX as a memory unit (XMU GADGET).
+Open for the owner: the program format (WebAssembly or not), the CALL name for the "???" pill, the title ID letters,
+where the score service runs, whether to publish the mockup.
