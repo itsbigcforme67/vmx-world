@@ -28,7 +28,9 @@ Xbox it looks like a memory unit. That one fact gives us most of the platform fo
   The FOLD level builder is the model case: you build rooms in 3D on the TV, then send the level to the VMX.
   A retail game can also get an applet in World (its VMX unlocks, its score tables, its minigames) so you don't need
   its disc in the tray.
-- **Scores by phone.** Every VMX game keeps its high scores in one standard record. On the VMX's main menu,
+- **Scores.** Every VMX game keeps its high scores in one standard record. At the Xbox, World sends them over the
+  network (it reads them from the hard disk and the VMX in the controller). The phone call is the VMX's own
+  feature, for when it is away from the Xbox (owner, 2026-10-20: the call belongs only on the VMX). On the VMX's main menu,
   **CALL** sends the scores from all your recent games at once over a phone call to a free 1-800 number: the VMX
   dials by tone and sends the data as modem sounds through its beeper, held to the phone's mouthpiece. You don't
   need broadband or an Xbox for this; the VMX does it on its own. The World disc then shows the national tables.
@@ -129,8 +131,8 @@ an owner's name (8 letters, set in SETTINGS) and a serial number, sent once per 
 
 ## Calling in (the VMX's CALL menu)
 
-The VMX's main menu has four pills: GAMES, SAVES, SETTINGS and a "???" placeholder. **(proposed)** The placeholder
-becomes **CALL**.
+The VMX's main menu has four pills: GAMES, SAVES, SETTINGS and a "???" placeholder. The placeholder becomes **CALL** (built in the
+VMX simulator).
 
 1. CALL lists the scores not sent yet (from every game on the VMX). A sends them all.
 2. The VMX says: hold its top to the phone's mouthpiece, press A. It dials **1-800** by tone (DTMF), like the pocket
@@ -159,8 +161,8 @@ Each byte goes as a start bit, 8 data bits (lowest first) and a stop bit.
   the score service. The VMX doesn't change: you hold it to the phone's mic instead of a handset.
 - **A real number** (later, maybe): a VoIP number whose call audio is streamed to our server, which runs the same
   decoder and plays the voice back.
-- **The Xbox**: World can also read SCORES.DAT straight from the VMX or the hard disk and send it online. Still the
-  same records.
+- **The Xbox** doesn't call: World reads SCORES.DAT from the VMX or the hard disk and sends it over the network.
+  Same records.
 
 The decoder is shared (one C version for tests and the ESP32, one JavaScript version for the phone page and the
 mockup) and is tested through a fake phone line: band-pass 300-3400 Hz, 8 kHz mu-law, noise, and the beeper's own
@@ -178,7 +180,8 @@ Tabs along the top (the VMX main menu's pill arc, grown up for the TV):
   Install, remove, copy saves, delete.
 - **PLAY**: the simulator. Any VMX game on the hard disk runs on the TV with the pad (the left stick or D-pad,
   A and B; BACK is the VMX's side button). Its saves are the same files.
-- **SCORES**: your records, the national tables (downloaded), and how to call in.
+- **SCORES**: your records, the national tables (downloaded), and SEND ONLINE. No phone call here: that is only
+  on the VMX.
 - **APPLETS**: Xbox-side programs from downloaded games and for retail games (FOLD BUILDER first).
 
 A retail game's **World Kit** is a cut-down World inside that game: install its VMX games, show its scores, and a
@@ -204,7 +207,8 @@ JS cores to C once, which the real VMX firmware needs anyway.
 ## Building it (plan)
 
 1. **This design + a TV mockup** (`mockup/world.html`): every tab, the simulator running the real game cores, the
-   install flow with made-up downloads, and the score call played as real modem sound from real records.
+   install flow with made-up downloads, scores sent online. CALL itself is built into the VMX simulator
+   (Pocket Arcade `vmx/`, branch `vmx-call`), using `mockup/modem.js`.
 2. **Formats in code**: a package tool (`tools/vxp.py` pack/unpack/list) and the score record in Python, C and JS,
    with shared test files so all three agree.
 3. **The modem**: C encoder (for the VMX), JS + C decoder, the fake phone line test, then the phone page.

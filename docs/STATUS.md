@@ -3,6 +3,18 @@
 Read `docs/DESIGN.md` first: it is the plan (the 2002 story, the save layout, GAME.VXP, the score record, the
 phone call, the World disc's tabs, the open question about the program format).
 
+## 2026-10-20 later: the call is VMX-only (owner)
+
+Owner: "The call in features need to be accessible from just the VMX. Having them on the TV is superfluous since we
+can just use the network there." So:
+- World's SCORES tab now has SEND ONLINE (made-up network, real records packed by modem.js), no call screens.
+- CALL is on the VMX simulator's main menu (was "???"): Pocket Arcade branch `vmx-call`, committed locally, NOT
+  pushed (the simulator is live on Pages; needs the owner's OK to merge/push). Screens: list of new scores ->
+  HOLD MY TOP TO THE PHONE -> dialling 1-800-VMX-WRLD (DTMF) -> "when it says SEND NOW press A" -> sending (Bell 202
+  x3) -> the VMX's 4-digit code, A = matches (marks them sent), B = try again. The call's sound plays even with SOUND
+  off (it is the data). Records sent are remembered per game by value (`sent` in vmx-saves), so a new best is new again.
+  `tools/vmx-sync.sh` copies modem.js from here.
+
 ## 2026-10-20: design + TV mockup
 
 Owner's brief (chat, 2026-10-20): an Xbox-side downloader / installer / launcher for VMX games; games from retail

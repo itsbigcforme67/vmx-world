@@ -1,7 +1,7 @@
 // VMX World mockup: the Xbox disc's TV screens (docs/DESIGN.md "The World disc"). 640 x 480, driven by the pad or
 // the keyboard. The games are the VMX simulator's adapters and cores (vmx/, copied by tools/sync.sh); downloads,
-// the VMX in the controller and the national tables are made up. The score call is real: real records, real modem
-// sound (modem.js), decoded again through a fake phone line before the check code is shown.
+// the VMX in the controller, the network and the national tables are made up. Scores go up over the network as the
+// real records (modem.js packs them). Calling in by phone is the VMX's own job (CALL on its menu), not World's.
 import { GAMES as SIM } from "./vmx/games.js";
 import * as M from "./modem.js";
 
@@ -112,17 +112,9 @@ const sMove = () => tone(880, 0, 0.05, 0.03);
 const sOk = () => { tone(660, 0, 0.08); tone(990, 0.06, 0.12); };
 const sBack = () => { tone(740, 0, 0.07); tone(494, 0.06, 0.1); };
 const sErr = () => tone(160, 0, 0.18, 0.06, "square");
-let callSrc = null;
-function playSamples(x, sr) {
-  const a = audio(); if (!a) return null;
-  const b = a.createBuffer(1, x.length, sr); b.copyToChannel(x, 0);
-  const s = a.createBufferSource(), g = a.createGain(); g.gain.value = 0.25;
-  s.buffer = b; s.connect(g).connect(a.destination); s.start(); return s;
-}
-
 // ---------------------------------------------------------------- the TV
 const TABS = ["NEWS", "GET GAMES", "MY VMX", "PLAY", "SCORES", "APPLETS"];
-const S = { tab: 0, zone: "tabs", sel: {}, col: 0, menu: null, dl: null, play: null, call: null, applet: null, toast: null };
+const S = { tab: 0, zone: "tabs", sel: {}, col: 0, menu: null, dl: null, play: null, up: null, applet: null, toast: null };
 const sel = (k, n) => { const v = S.sel[k] || 0; return Math.max(0, Math.min(n - 1, v)); };
 const el = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -159,11 +151,9 @@ function draw() {
   if (S.toast && performance.now() - S.toast.at < 2600) { tst.textContent = S.toast.t; tst.className = "toast show"; }
   else tst.className = "toast";
   el("#overlay").innerHTML = overlay();
-  const cv = el("#callvmx"); if (cv) cv.appendChild(device);          // the VMX's own CALL screen during a call
 }
 const hint = (k, t) => `<span class="h"><b class="k k${k}">${k}</b>${t}</span>`;
 function hints() {
-  if (S.call) return S.call.stage === "done" ? hint("A", "DONE") : hint("B", "HANG UP");
   if (S.applet) return hint("B", "BACK TO WORLD");
   if (S.play) return hint("A", "") + hint("B", "") + `<span class="h">D-PAD / STICK</span><span class="h"><b class="k kBK">BACK</b>VMX SIDE BUTTON: QUIT</span>`;
   if (S.menu) return hint("A", "SELECT") + hint("B", "CANCEL");
@@ -224,8 +214,9 @@ function scores() {
         <div><small>STATUS</small><b class="${sent ? "" : "new"}">${sent ? "SENT " + sent : "NOT SENT"}</b></div>` : `<p class="empty">NO SCORE YET: PLAY IT ON THE VMX OR IN PLAY</p>`}</div>
       <h3>NATIONAL TOP 5 <small>(MADE UP)</small></h3>
       <ol class="nat">${table.map(e => `<li class="${e.you ? "you" : ""}"><span>${e.name}</span><b>${e.score}</b></li>`).join("")}</ol>
-      <div class="act ${S.zone === "content" ? "focus" : ""}">${unsent.length ? `A &nbsp;CALL IN ${unsent.length} NEW SCORE${unsent.length === 1 ? "" : "S"} FROM THE VMX` : "NO NEW SCORES TO CALL IN"}</div>
-      <small class="note">On the VMX this is CALL on its main menu; here World shows and plays the call for it.</small>
+      <div class="act ${S.zone === "content" ? "focus" : ""}">${S.up ? `SENDING ${S.up.n} SCORE${S.up.n === 1 ? "" : "S"} (${S.up.bytes} BYTES)...` : unsent.length ? `A &nbsp;SEND ${unsent.length} NEW SCORE${unsent.length === 1 ? "" : "S"} ONLINE` : "NO NEW SCORES TO SEND"}</div>
+      ${S.up ? `<div class="bar"><i style="width:${S.up.p * 100}%"></i></div>` : ""}
+      <small class="note">World reads the scores from the hard disk and the VMX and sends them over the network. Away from the Xbox, the VMX calls them in by phone itself: CALL on its main menu.</small>
     </div>`;
 }
 function national(c, yours) {
@@ -246,18 +237,8 @@ function overlay() {
   if (S.menu) return `<div class="menu"><h3>${esc(S.menu.title)}</h3>${S.menu.items.map((m, i) => `<div class="row ${i === S.menu.k ? "sel" : ""}" data-menu="${i}">${m[0]}</div>`).join("")}</div>`;
   if (S.applet) return `<div class="applet"><div class="shot big" style="background-image:url(${S.applet.img})"></div>
     <p>On the Xbox, World starts <b>${S.applet.name}</b> here (TDATA\\56580001\\APPS\\${hex(byId(S.applet.from).tid)}\\default.xbe), and returns to World when you quit. This is its level view, from the FOLD repo.</p></div>`;
-  if (S.call) return callView();
   return "";
 }
-function callView() {
-  const C = S.call, steps = [["HOLD THE VMX TO THE PHONE", "dial"], ["DIALLING 1-800-VMX-WRLD", "dial"], ["SENDING " + C.n + " SCORES (3 TIMES)", "send"], ["THE VOICE READS BACK A CODE", "check"]];
-  const at = { dial: 1, send: 2, check: 3, done: 4 }[C.stage];
-  return `<div class="call"><div id="callvmx"></div><h3>CALLING IN</h3><canvas id="scope" width="300" height="60"></canvas>
-    <ol>${steps.map((s, i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">${s[0]}</li>`).join("")}</ol>
-    ${C.stage === "done" ? `<p class="code">VOICE: <b>"${C.heard ? C.heard.split("").join(" ") : "- - - -"}"</b> &nbsp; VMX: <b>${C.code}</b></p>
-      <p>${C.heard === C.code ? `The service decoded ${C.copies} of 3 copies through a fake phone line. The codes match, so the VMX marks these scores sent.` : "No copy got through. Try again."}</p>` : ""}</div>`;
-}
-
 // ---------------------------------------------------------------- the VMX screen (simulator)
 function blit(buf) {
   const d = img.data;
@@ -268,7 +249,6 @@ const scr = new Surf(64, 64);
 function idleScreen() {
   scr.clear();
   const lib = ST.hdd.map(byId), c = lib[sel("play", lib.length)];
-  if (S.call) return callScreen();
   if (!c) { scr.centre(28, "NO GAMES"); return blit(scr.d); }
   for (let j = 0; j < 24; j++) for (let i = 0; i < 24; i++) if (c.card.d[j * 24 + i]) scr.px(20 + i, 8 + j);
   scr.rrect(18, 6, 28, 28);
@@ -276,17 +256,6 @@ function idleScreen() {
   scr.centre(56, "A: PLAY");
   blit(scr.d);
 }
-function callScreen() {                                   // the VMX's own CALL screen during the call
-  const C = S.call; scr.clear();
-  scr.centre(3, "CALL");
-  scr.line(0, 10, 63, 10);
-  if (C.stage === "dial") { scr.centre(20, "DIALLING"); scr.centre(30, C.digits || ""); }
-  else if (C.stage === "send") { scr.centre(18, "SENDING"); scr.centre(26, C.n + " SCORES");
-    const p = Math.min(1, C.p || 0); scr.rect(8, 40, 48, 6); scr.fill(9, 41, Math.round(46 * p), 4); }
-  else if (C.stage === "check" || C.stage === "done") { scr.centre(18, "CODE"); scr.centre(28, C.code); scr.centre(44, "A: IT MATCHES"); scr.centre(52, "B: TRY AGAIN"); }
-  blit(scr.d);
-}
-
 // game loop pieces (as vmx.js tickGame)
 const BTN = ["up", "down", "left", "right", "a", "b"];
 const held = {}, latch = {};
@@ -337,50 +306,22 @@ function mineAction() {
     ]);
   }
 }
-async function call() {
+// SCORES: send every unsent record online (made-up network; the bytes are the real records)
+function sendOnline() {
+  if (S.up) return;
   const games = CAT.filter(c => recordOf(c) && !ST.sent[c.id]);
-  if (!ST.vmxIn) { sErr(); return toast("PUT A VMX IN CONTROLLER 1"); }
   if (!games.length) { sErr(); return toast("NO NEW SCORES: PLAY SOMETHING FIRST"); }
-  const recs = games.map(recordOf);
-  const msg = M.packMessage({ serial: ST.serial, name: ST.owner, records: recs });
-  const sr = audio()?.sampleRate || 48000;
-  const x = M.callAudio(msg, { sr, square: true });
-  // the service's side: through a phone line, decoded, before the voice reads the code back
-  const got = M.decode(M.phoneLine(x, sr, { noise: 0.02, seed: ST.serial }), 8000)
-    .filter(g => g.msg.serial === ST.serial && g.msg.records.length === recs.length);
-  const { plan, len } = M.callPlan(msg);
-  S.call = { n: recs.length, code: M.checkCode(msg), heard: got.length ? M.checkCode(got[0].raw) : null, copies: got.length,
-    games: games.map(g => g.id), stage: "dial", t0: performance.now(), plan, len, x, sr };
-  try { callSrc?.stop(); } catch {}
-  callSrc = playSamples(x, sr);
-  sOk(); draw();
+  const msg = M.packMessage({ serial: ST.serial, name: ST.owner, records: games.map(recordOf) });
+  S.up = { n: games.length, bytes: msg.length, games: games.map(g => g.id), p: 0, t0: performance.now() }; sOk();
 }
-function tickCall(now) {
-  const C = S.call; if (C.stage === "done") return;
-  const t = (now - C.t0) / 1000;
-  const digits = C.plan.filter(p => p.kind === "dtmf" && p.t <= t).map(p => p.d).join("");
-  const data = C.plan.filter(p => p.kind === "data"), first = data[0], last = data[data.length - 1];
-  const stage = t < first.t ? "dial" : t < last.t + last.dur ? "send" : t < C.len + 1.2 ? "check" : "done";
-  C.digits = digits.length > 1 ? "1-" + digits.slice(1, 4) + (digits.length > 4 ? "-" + digits.slice(4) : "") : digits;
-  C.p = (t - first.t) / (last.t + last.dur - first.t);
-  if (stage !== C.stage) { C.stage = stage; if (stage === "done") { if (C.heard === C.code) sOk(); else sErr(); } draw(); }
-  // the scope: the last 20 ms of what the beeper is playing
-  const sc = el("#scope"); if (sc) {
-    const g = sc.getContext("2d"), n = Math.round(0.02 * C.sr), at = Math.max(0, Math.min(C.x.length - n, Math.round(t * C.sr)));
-    g.fillStyle = "#020602"; g.fillRect(0, 0, sc.width, sc.height); g.strokeStyle = ON; g.lineWidth = 1.5; g.beginPath();
-    for (let i = 0; i < sc.width; i++) { const v = C.x[at + Math.floor(i * n / sc.width)] || 0; g.lineTo(i, sc.height / 2 - v * sc.height * 0.7); }
-    g.stroke();
-  }
-  callScreen();
-}
-function endCall(accept) {
-  const C = S.call; S.call = null; if (S.tab !== 3) device.remove(); try { callSrc?.stop(); } catch {} callSrc = null;
-  if (accept && C.stage === "done" && C.heard === C.code) {
+function tickUp(now) {
+  const U = S.up; U.p = Math.min(1, (now - U.t0) / 1500);
+  if (U.p >= 1) {
     const when = new Date().toISOString().slice(5, 10).replace("-", "/");
-    for (const id of C.games) ST.sent[id] = when;
-    save(); toast(C.n + " SCORES SENT");
-  } else sBack();
-  draw();
+    for (const id of U.games) ST.sent[id] = when;
+    S.up = null; save(); sOk(); toast(U.n + " SCORE" + (U.n === 1 ? "" : "S") + " SENT");
+  }
+  if (S.tab === 4) draw();
 }
 
 // ---------------------------------------------------------------- input
@@ -391,7 +332,6 @@ function press(b) {                                       // b: up down left rig
     if (BTN.includes(b)) { held[b] = true; latch[b] = true; }
     return;
   }
-  if (S.call) { if (b === "a" && S.call.stage === "done") endCall(true); else if (b === "b") endCall(false); return; }
   if (S.applet) { if (b === "b" || b === "back") { S.applet = null; sBack(); draw(); } return; }
   if (S.menu) {
     const m = S.menu;
@@ -421,7 +361,7 @@ function press(b) {                                       // b: up down left rig
   if (S.tab === 1) download(CAT[sel("shop", CAT.length)]);
   else if (S.tab === 2) mineAction();
   else if (S.tab === 3) { const c = byId(ST.hdd[sel("play", ST.hdd.length)]); if (c) startGame(c); }
-  else if (S.tab === 4) call();
+  else if (S.tab === 4) sendOnline();
   else if (S.tab === 5) { const a = APPLETS[sel("applets", APPLETS.length)];
     if (!a.from) sErr(); else if (!ST.hdd.includes(a.from)) { sErr(); toast("GET " + byId(a.from).title + " FIRST"); } else { S.applet = a; sOk(); } }
   draw();
@@ -481,7 +421,7 @@ function frame(now) {
     while (acc >= 1 / 30 && S.play) { acc -= 1 / 30; tickGame(); }
     if (S.play) blit(S.play.a.draw(S.play.g));
   } else acc = 0;
-  if (S.call) tickCall(now);
+  if (S.up) tickUp(now);
   if (S.toast && now - S.toast.at > 2600) { S.toast = null; draw(); }
   requestAnimationFrame(frame);
 }

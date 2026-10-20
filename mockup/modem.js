@@ -81,11 +81,11 @@ function tones(out, at, sr, freqs, dur, amp, square) {
 // bits for one byte: start (0), 8 data bits lowest first, stop (1)
 const frame = b => [0, ...Array.from({ length: 8 }, (_, k) => (b >> k) & 1), 1];
 
-// Plan of the whole call: [{t, kind, ...}] in seconds, and the total length.
+// Plan of the whole call (number "" = data only; copies 0 = dial only): [{t, kind, ...}] in seconds, and the total length.
 export function callPlan(msg, number = "18008699753", copies = 3) {
-  const plan = []; let t = 0.2;
-  for (const d of keypad(number)) { plan.push({ t, kind: "dtmf", d, dur: 0.09 }); t += 0.16; }
-  t += 1.6;                                                   // the voice answers ("Send now"), the player presses A
+  const plan = [], digits = keypad(number); let t = 0.2;
+  for (const d of digits) { plan.push({ t, kind: "dtmf", d, dur: 0.09 }); t += 0.16; }
+  if (digits && copies) t += 1.6;                             // the voice answers ("Send now"), the player presses A
   for (let c = 0; c < copies; c++) {
     plan.push({ t, kind: "data", copy: c, dur: 0.3 + (2 + msg.length) * 10 / BAUD + 0.05 });
     t += plan[plan.length - 1].dur + 0.25;
