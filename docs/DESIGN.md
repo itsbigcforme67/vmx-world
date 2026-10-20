@@ -187,22 +187,33 @@ Tabs along the top (the VMX main menu's pill arc, grown up for the TV):
 A retail game's **World Kit** is a cut-down World inside that game: install its VMX games, show its scores, and a
 "get VMX World" advert.
 
-## The program (open question)
+## The program: VMX managed code (decided 2026-10-20)
 
-A VMX game has to run on the VMX (ESP32-S3), in World's simulator (Xbox, Pentium III), on PC and in the web
-simulator, from the same GAME.VXP. Options:
+Owner's decision: VMX games are managed code on a small Microsoft .NET runtime, not native code and not Java.
 
-1. **(recommended)** One small portable program format: games are written in C against a VMX API (screen, buttons,
-   beeper, saves, other games' saves) and compiled to WebAssembly. wasm3 (a small interpreter in C) runs it on the
-   ESP32-S3 and in the Xbox simulator; browsers run it natively. In the 2002 story it is "VMX byte code", much as
-   J2ME phones ran Java at the time. 64 x 64 1-bit games need very little speed.
-2. Native ESP32 code, and World emulates the ESP32's CPU. Faithful to how the Dreamcast's VMU worked, but a lot
-   of work and slow on a 733 MHz Pentium III.
-3. Each game built twice (ESP32 and Xbox) and both builds packed in GAME.VXP. Simple, but every homebrew author
-   needs both toolchains.
+**The 2002 story.** Microsoft lost its Java licence in the Sun settlement (January 2001) and bet on .NET (betas
+November 2000 and June 2001, 1.0 in February 2002). Microsoft Research's SPOT project ran a tiny .NET runtime on
+watch-sized hardware (unveiled at COMDEX, November 2002). The VMX team took that runtime in late 2001 and had about a
+year to launch in November 2002, the same month as Xbox Live. Developers get a "VMX SDK" for Visual Studio .NET 2002
+with an emulator, as Microsoft's toolkit for small devices worked then. Games are written in **C# 1.0**: classes, structs, arrays,
+strings, no generics (those came in 2005). That limit is the era's own sandbox.
 
-Our games today are JavaScript cores (the web simulator) except FOLD, which has a C core. Option 1 means porting the
-JS cores to C once, which the real VMX firmware needs anyway.
+- **Downloaded and homebrew games are managed code only.** They can't touch the hardware: only the VMX calls
+  (screen, buttons, beeper, their own saves, reading other games' saves, reporting scores), inside a fixed memory
+  budget. The firmware (menus, CALL) is native, like a phone's built-in Snake. Retail-licensed games are managed too.
+- **Limits (proposed):** heap 64 KB, game code + data up to 16 blocks (256 KB), 30 ticks a second.
+
+**How we build it.** Not nanoFramework (SPOT's real descendant, MIT, runs on the ESP32-S3): it is big, built on
+ESP-IDF, and hard to bring to the Xbox and the browser. Instead:
+1. Games compile with the normal C# compiler set to C# 1.0 (`LangVersion ISO-1`) against **our own small core
+   library** (System.Object, String, arrays, Math...) and the **VMX library**, so nothing else exists to call.
+2. A PC tool (the "linker") reads the compiled assembly, refuses anything outside the subset (generics, 64-bit maths,
+   threads, reflection), resolves every reference, and writes a compact image into GAME.VXP's CODE chunk.
+3. A small interpreter in plain C runs that image: the same file on the VMX (ESP32-S3), the CoreS3 rig, the Xbox
+   simulator, PC and (compiled to WebAssembly) the browser.
+
+The JS cores are ported to C# one by one and checked frame for frame against the JS versions. FOLD ROOMS keeps its
+C core as built-in software until it is ported.
 
 ## Building it (plan)
 
