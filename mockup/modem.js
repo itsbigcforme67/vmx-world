@@ -185,7 +185,6 @@ export function decode(x, sr = 8000) {
       if (j >= lim || j >= d.length) break;
       t0 = j - N / 2;
     }
-    if (globalThis.MODEM_DEBUG && bytes.length) console.log("run", (i / sr).toFixed(3), bytes.slice(0, 24).map(v => v.toString(16)).join(" "));
     const k = bytes.indexOf(0x56);
     if (bytes[0] === 0x7E && k > 0) {
       const m = unpackMessage(Uint8Array.from(bytes.slice(k)));
