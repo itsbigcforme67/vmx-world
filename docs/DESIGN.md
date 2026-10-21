@@ -201,7 +201,7 @@ strings, no generics (those came in 2005). That limit is the era's own sandbox.
 - **Downloaded and homebrew games are managed code only.** They can't touch the hardware: only the VMX calls
   (screen, buttons, beeper, their own saves, reading other games' saves, reporting scores), inside a fixed memory
   budget. The firmware (menus, CALL) is native, like a phone's built-in Snake. Retail-licensed games are managed too.
-- **Limits (proposed):** heap 64 KB, game code + data up to 16 blocks (256 KB), 30 ticks a second.
+- **Limits:** heap 128 KB (owner, 2026-10-20), game code + data up to 16 blocks (256 KB), 30 ticks a second.
 
 **How we build it.** Not nanoFramework (SPOT's real descendant, MIT, runs on the ESP32-S3): it is big, built on
 ESP-IDF, and hard to bring to the Xbox and the browser. Instead:
