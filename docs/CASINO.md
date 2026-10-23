@@ -47,9 +47,15 @@ Chips are play money. They can't be bought, and nothing real can be won with the
 | --- | --- | --- | --- |
 | BLACKJACK AND HOOKERS | 56581005 | bet 5-50 a hand; blackjack pays 3:2 | broke (under 5): "OUT OF BAIT / MORE TOMORROW" |
 | 9-BALL | 56581009 | stake 0-50 a rack (0 = friendly); a won rack pays the stake back doubled | slow and skill-based: the "build up slowly" table |
+| VIDEO POKER | 5658100A | bet 1-5; Jacks or Better, full-pay 9/6 (royal 4000 at 5 chips) | 99.54% return with perfect play at max bet (98.4% under 5); the careful builder |
+| ROULETTE | 5658100B | chips in 1s, up to 50 a bet; red/black, odd/even, 1-18/19-36 (1:1), dozens (2:1), one number (35:1) | single zero: 97.3% return on every bet; bets stay on between spins |
+| SLOTS | 5658100C | bet 1-3; 3 reels x 24 stops, 1 line; 3 VMX chips = jackpot (3000 at 3 chips) | 93.4% return (94.85% at 3 chips), a win on 18.45% of spins; the fast, risky table |
 
-Ideas for more tables (none built; owner to pick): video poker (low variance, a good slow builder), slots (fast,
-risky), roulette, craps, keno or scratch cards, horse or frog racing, a casino version of BOG HOP.
+Every new table's board is its biggest single payout (Video Poker's field 1 = hands played). The outcome always
+comes from the RNG first; animations only land on it (slot stops and the roulette ball can't change the odds).
+Return figures are exact (slots enumerated over all 13824 stop combinations; checked again by the coordinator).
+
+More table ideas (not built): craps, keno or scratch cards, horse or frog racing, a casino version of BOG HOP.
 
 ## The leaderboard record (built)
 

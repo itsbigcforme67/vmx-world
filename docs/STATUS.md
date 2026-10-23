@@ -64,3 +64,7 @@ Owner's brief and calls are in `docs/CASINO.md` (read it first). Built:
 - Research: `docs/research/CASHIER_SAVES.md` (save signing, per-game formats, trainer route). GTA III first.
 Next: a PC save tool for GTA III (edit + checksum + re-sign, tested in xemu with the owner's own disc), then KOTOR /
 Vice City; Shenmue II needs a save diff. Real online boards need the score service (owner decides where).
+
+## 2026-10-22 later: three more casino tables
+VIDEO POKER, ROULETTE and SLOTS (CASINO.md "The games") are in GET GAMES (casino shelf, 2 blocks each) and play from
+the shared bank; the cashier opens with any casino game installed.

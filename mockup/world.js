@@ -71,6 +71,9 @@ const CAT = [
   { id: "invasion", tid: 0x56581004, pub: "VMX Studio", blocks: 1, shelf: "arcade", blurb: "Rows of invaders march down. Hold the line from behind your bunkers." },
   { id: "blackjack", tid: 0x56581005, pub: "VMX Studio", blocks: 1, shelf: "casino", title: "BLACKJACK AND HOOKERS", applet: "CASINO CASHIER", blurb: "Blackjack on the pier. Bet your bait, beat the dealer, don't go bust. A VMX CASINO game: bait is chips, shared with every casino table." },
   { id: "pool", tid: 0x56581009, pub: "VMX Studio", blocks: 3, shelf: "casino", title: "9-BALL", applet: "CASINO CASHIER", blurb: "Pool against the VMX: hit the lowest ball first, sink the 9 to win. Stake casino chips on each rack, and get down low behind the cue to line up the shot." },
+  { id: "poker", tid: 0x5658100A, pub: "VMX Studio", blocks: 2, shelf: "casino", title: "VIDEO POKER", applet: "CASINO CASHIER", blurb: "Jacks or Better on a full-pay table. Hold the right cards and it pays back nearly everything: the patient way to grow your casino chips." },
+  { id: "roulette", tid: 0x5658100B, pub: "VMX Studio", blocks: 2, shelf: "casino", title: "ROULETTE", applet: "CASINO CASHIER", blurb: "A single-zero wheel. Spread your chips on red, black, the dozens or one lucky number, then watch the ball drop." },
+  { id: "slots", tid: 0x5658100C, pub: "VMX Studio", blocks: 2, shelf: "casino", title: "SLOTS", applet: "CASINO CASHIER", blurb: "Three reels, one pull. Line up three VMX chips for the jackpot. Fast and risky: the quickest way to win chips, and to lose them." },
   { id: "checkers", tid: 0x56581006, pub: "VMX Studio", blocks: 1, shelf: "cards", f: ["WON", "LOST", "DRAWN"], blurb: "American checkers against a VMX that thinks ahead." },
   { id: "reversi", tid: 0x56581007, pub: "VMX Studio", blocks: 1, shelf: "cards", f: ["WON", "LOST", "DRAWN"], blurb: "Flip the board your colour. Easy to learn, hard to master." },
   { id: "tricky", tid: 0x56588001, pub: "Homebrew", blocks: 2, shelf: "homebrew", blurb: "Light every wick before the candles run out. A homebrew puzzle game." },
@@ -138,7 +141,7 @@ const NEWS = [
 
 const APPLETS = [
   { id: "foldb", name: "FOLD BUILDER", from: "fold", what: "Build FOLD ROOMS levels in 3D: fold the working plane round the shape, place walls, boxes and targets, wire up buttons and gates. Test on the VMX window, then send the level to your VMX.", img: "img/fold-builder.png" },
-  { id: "cashier", name: "VMX CASINO CASHIER", from: ["pool", "blackjack"], what: "Cash your VMX CASINO chips in for money in your Xbox games. The cashier finds their saves on the hard disk, adds the money, and re-signs the save so the game takes it. Each game has its own rate and a daily limit. Chips cashed out leave your stash for good.", view: cashierView, key: cashierKey },
+  { id: "cashier", name: "VMX CASINO CASHIER", from: ["pool", "blackjack", "poker", "roulette", "slots"], what: "Cash your VMX CASINO chips in for money in your Xbox games. The cashier finds their saves on the hard disk, adds the money, and re-signs the save so the game takes it. Each game has its own rate and a daily limit. Chips cashed out leave your stash for good.", view: cashierView, key: cashierKey },
   { id: "kit", name: "RETAIL APPLET (EXAMPLE)", from: null, what: "Each retail game with VMX features gets an applet here: its VMX games, the unlocks traded with the disc game, and its score tables, without the disc in the tray. None yet in this mockup." },
 ];
 
