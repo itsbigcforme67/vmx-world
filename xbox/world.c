@@ -7,6 +7,7 @@
 #include "../../microgames/fold/app/gfx.h"
 #include "../../vmx-firmware/core/vmxfw.h"
 #include "hdd.h"
+#include "holo.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,7 @@ static struct {
   uint32_t vmxMs;
 } W;
 static uint8_t *vxpData[MAXVXP]; static int nVxpData;
+static int haveHolo;                                    // the skeleton hologram's data loaded (assets/vmx_holo.bin)
 
 static void toast(const char *m) { snprintf(W.toast, sizeof W.toast, "%s", m); W.toastT = 75; }
 
@@ -226,14 +228,14 @@ static void play_row(int i, int x, int y, int w, int sel) { mine_row(i, x, y, w,
 static void draw_play(void) {
   if (!W.playing) list(32, 100, 230, 330, NINSTALLED, W.sel[T_PLAY], play_row);
   if (W.playing) {
-    draw_vmx(224, 189, 3);
+    if (haveHolo) holo_draw(HOLO_PLAY, W.t, vmx_screen(), vmx_on()); else draw_vmx(224, 189, 3);
     const char *m = "D-PAD, A AND B ARE THE VMX'S. BACK IS ITS SIDE BUTTON.";
     gfx_text5(320 - gfx_text5_w(1, m) / 2, 418, 1, MUTED, m);
     hints(NULL, NULL, "BACK TO WORLD");
   } else {
     gfx_panel(276, 100, 332, 330, "YOUR VMX", LIT);
-    draw_vmx(378, 196, 2);
-    wrap(292, 352, 300, 1, MUTED, "THE VMX RUNS ON THE TV WITH EVERY GAME ON THE HARD DISK. ITS SAVES, SCORES AND CHIPS STAY ON THE HARD DISK.", 4);
+    if (haveHolo) holo_draw(HOLO_LIST, W.t, vmx_screen(), vmx_on()); else draw_vmx(378, 196, 2);
+    wrap(292, 372, 300, 1, MUTED, "THE VMX RUNS ON THE TV WITH EVERY GAME ON THE HARD DISK. ITS SAVES, SCORES AND CHIPS STAY ON THE HARD DISK.", 4);
     hints("TURN ON THE VMX", "BACK", NULL);
   }
 }
@@ -337,6 +339,11 @@ static void draw_applets(void) {
 void app_init(const char *levelsDir) {
   (void)levelsDir;
   memset(&W, 0, sizeof W);
+#ifdef NXDK
+  haveHolo = holo_load("D:\\assets\\vmx_holo.bin");
+#else
+  haveHolo = holo_load("build/disc/assets/vmx_holo.bin");
+#endif
   LOG("init"); hdd_init(); LOG("hdd ok"); vmx_reload(); LOG("vmx ok"); load_scores(); LOG("ready");
   // the brushed metal FOLD's panels use (not needed for World's own look, but the font and panels come from gfx.c)
 }
@@ -358,6 +365,7 @@ void app_frame(const Pad *pad) {
   if (pad->ly < -0.6f) held |= PAD_UP; if (pad->ly > 0.6f) held |= PAD_DOWN;
   if (pad->lx < -0.6f) held |= PAD_LEFT; if (pad->lx > 0.6f) held |= PAD_RIGHT;
   unsigned e = held & ~W.prev; W.prev = held; W.t++;
+  holo_prepare();                                     // the hologram's pictures, one a tick until ready
   if (W.toastT) W.toastT--;
   if (W.dl && --W.dl == 0) {                           // a download finished: on to the hard disk
     for (int i = 0; i < NCATALOG; i++) if (CATALOG[i].id == W.dlId) { if (hdd_install(&CATALOG[i])) { toast("DOWNLOADED"); W.gamesDirty = 1; } else toast("COULDN'T WRITE THE HARD DISK"); }

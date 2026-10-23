@@ -227,3 +227,15 @@ C core as built-in software until it is ported.
    the UDATA layout, the simulator running C cores, FOLD BUILDER launched as the first applet.
 5. **The real VMX link**: the VMX as a memory unit (FATX on its flash), with `XMU GADGET`'s board.
 6. **The score service and the phone page**: needs a server; the owner decides where it runs.
+
+## The look on the Xbox side: skeleton holograms (owner, 2026-10-23)
+
+Owner: "I think maybe we lean into this skeleton hologram look for all VMX stuff on the Xbox side. It's very cool."
+The VMX on the TV is a green x-ray hologram of its real CAD model (shells, side button and its own D-pad caps and
+A/B; never the sleeve's parts): glowing see-through faces, brighter where they turn away; the parts' sharp edges;
+the glass hides the insides so the VMX's live picture reads; bloom, scanlines, a rolling bright band, a faint
+flicker, and a projector disc with a beam under it. Preferred over the outline-only version.
+- Built: World's PLAY (xbox/holo.c; data tools/hologram_export.py -> xbox/assets/vmx_holo.bin; preview and
+  comparison images tools/hologram_preview.py -> docs/hologram/).
+- To follow (same look): other VMX things on the Xbox: MY VMX / GET GAMES details, applets' VMX windows (FOLD
+  BUILDER's VMX popup), retail World Kits, loading and boot screens.

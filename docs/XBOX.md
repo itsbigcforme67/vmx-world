@@ -10,7 +10,8 @@ Xbox for real"). The look follows `mockup/world.html`; everything in it is real 
   the VXP is copied to the hard disk as a save of VMX World (below). Title, publisher, blurb and the 24x24 card all
   come out of the VXP itself.
 - **MY VMX**: what's on the hard disk; A: play it or delete it.
-- **PLAY**: the real VMX on the TV: the VMX firmware's hardware-free core (vmx-firmware/core) with the .NET runtime
+- **PLAY**: the real VMX on the TV, as a turning skeleton hologram (xbox/holo.c; DESIGN.md "The look on the Xbox
+side"): the VMX firmware's hardware-free core (vmx-firmware/core) with the .NET runtime
   (vmx-firmware/runtime/vxrt.c) running every game on the hard disk, inside the owner's VMX render. The pad is the
   VMX's: D-pad, A, B; Back is its side button; Y goes back to World. Its saves, records and casino chips are files.
 - **SCORES**: the VMX's records per game and the VMX CASINO stash. Sending online needs the score service.
@@ -62,6 +63,13 @@ Each start of VMX World asks the laptop for the build's version and downloads it
   the picture itself, or the VMX render's soft edges blend with black.
 - vmx-firmware/core/surf.c's stand-in `gfx_glyph` is weak, so builds that link FOLD's gfx.c use FOLD's.
 - xemu's frame rate (20-25 fps here) isn't the console's: real numbers need the hardware.
+
+## The hologram's cost
+
+Each view's model picture (glow, edges, glass, bloom) is rendered once and kept: the turning VMX in 40 steps, made
+one per tick from World's start (about 5 s in xemu while NEWS shows), the big one once with a table of which VMX
+pixel each TV pixel shows. A frame then adds the kept picture, the beam and the live screen through a tint table.
+In xemu World runs at 15-17 fps with it (20-25 without); the console's own numbers are still to come.
 
 ## Next
 

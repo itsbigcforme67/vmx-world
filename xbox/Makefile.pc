@@ -3,7 +3,7 @@
 # disk build/hdd/. Run from vmx-world/xbox/:   make -f Makefile.pc && build/world_headless tests/tour.txt
 FOLD = ../../microgames/fold
 FW = ../../vmx-firmware
-SRC = world.c hdd.c $(FOLD)/app/gfx.c $(FOLD)/app/main_headless.c \
+SRC = world.c hdd.c holo.c $(FOLD)/app/gfx.c $(FOLD)/app/main_headless.c \
       $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c $(FW)/core/game_fold.c \
       $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c $(FOLD)/core/fold.c $(FOLD)/app/vmx.c
 CFLAGS = -O2 -Wall -Wno-unused-parameter -Wno-misleading-indentation -std=gnu11
@@ -14,5 +14,5 @@ build/world_headless: $(SRC) *.h disc
 disc:
 	mkdir -p build/disc/catalog build/disc/assets
 	cp $(FW)/build/games/*.VXP build/disc/catalog/
-	cp $(FOLD)/assets/vmx_large.rgba $(FOLD)/assets/vmx_small.rgba build/disc/assets/
+	cp $(FOLD)/assets/vmx_large.rgba $(FOLD)/assets/vmx_small.rgba assets/vmx_holo.bin build/disc/assets/
 .PHONY: disc

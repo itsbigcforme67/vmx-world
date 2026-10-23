@@ -8,7 +8,7 @@
 XBE_TITLE = VMX_World
 FOLD = ../../microgames/fold
 FW = ../../vmx-firmware
-SRCS = world.c hdd.c $(FOLD)/app/gfx.c $(FOLD)/app/main_xbox.c $(FOLD)/app/padscript.c $(FOLD)/xbox/gpu.c \
+SRCS = world.c hdd.c holo.c $(FOLD)/app/gfx.c $(FOLD)/app/main_xbox.c $(FOLD)/app/padscript.c $(FOLD)/xbox/gpu.c \
        $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c $(FW)/core/game_fold.c \
        $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c $(FOLD)/core/fold.c $(FOLD)/app/vmx.c
 CFLAGS += -O2 -include $(FOLD)/xbox/xbox_compat.h -include nxdk_compat.h -DNXDK -Wno-misleading-indentation
@@ -23,7 +23,7 @@ package: $(OUTPUT_DIR)/default.xbe
 	mkdir -p $(OUTPUT_DIR)/VMXWORLD/assets $(OUTPUT_DIR)/VMXWORLD/catalog
 	cp $(OUTPUT_DIR)/default.xbe $(OUTPUT_DIR)/VMXWORLD/
 	python3 ../tools/xbe_title_id.py $(OUTPUT_DIR)/VMXWORLD/default.xbe 0x56580001
-	cp $(FOLD)/assets/vmx_small.rgba $(FOLD)/assets/vmx_large.rgba $(OUTPUT_DIR)/VMXWORLD/assets/
+	cp $(FOLD)/assets/vmx_small.rgba $(FOLD)/assets/vmx_large.rgba assets/vmx_holo.bin $(OUTPUT_DIR)/VMXWORLD/assets/
 	cp $(FW)/build/games/*.VXP $(OUTPUT_DIR)/VMXWORLD/catalog/
 	if [ -n "$(DEMO)" ]; then cp $(DEMO) $(OUTPUT_DIR)/VMXWORLD/demo.txt; fi
 	$(EXTRACT_XISO) -c $(OUTPUT_DIR)/VMXWORLD $(OUTPUT_DIR)/vmxworld.iso >/dev/null
