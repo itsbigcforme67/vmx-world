@@ -17,7 +17,7 @@ disc:
 	cp $(FOLD)/assets/vmx_large.rgba $(FOLD)/assets/vmx_small.rgba assets/vmx_holo.pak build/disc/assets/
 .PHONY: disc holo
 # the hologram's pictures, made ahead of time (holo_bake.c): assets/vmx_holo.pak from assets/vmx_holo.bin
-holo: holo.c holo_bake.c hdd.c
+holo: holo.c holo_bake.c hdd.c vmxlink.c
 	mkdir -p build
-	$(CC) $(CFLAGS) -o build/holo_bake holo_bake.c holo.c hdd.c $(FOLD)/app/gfx.c -lm
+	$(CC) $(CFLAGS) -o build/holo_bake holo_bake.c holo.c hdd.c vmxlink.c $(FW)/core/fatx.c $(FW)/core/vmxvol.c $(FOLD)/app/gfx.c -lm
 	build/holo_bake
