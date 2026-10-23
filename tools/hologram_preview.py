@@ -14,12 +14,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 XMU = os.path.join(HERE, "..", "..", "XMU GADGET", "out")
 OUT = os.path.join(HERE, "..", "docs", "hologram")
 SHOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "xbox", "build", "shots", "p1.ppm")
-PARTS = ["xmu_front", "xmu_rear", "xmu_keypad", "xmu_dpad", "xmu_jewel_a", "xmu_jewel_b", "xmu_side_button"]
+PARTS = ["xmu_front", "xmu_rear", "xmu_side_button"]          # the device only (the keypad / D-pad / jewels are the sleeve's)
+CAPS = [os.path.join(HERE, "hologram_caps", "cap_%s.stl" % c) for c in ("up", "down", "left", "right", "a", "b")]   # its own caps (STEP -> STL)
 SCREEN = dict(x0=-10.05, x1=10.05, y0=32.97, y1=53.07, z=4.05)      # the active area (xmu_screen.py)
 GREEN = np.array([0.35, 1.0, 0.45])
 
 def load():
-    ms = [trimesh.load(os.path.join(XMU, p + ".stl")) for p in PARTS]
+    ms = [trimesh.load(os.path.join(XMU, p + ".stl")) for p in PARTS] + [trimesh.load(c) for c in CAPS]
     m = trimesh.util.concatenate(ms)
     edges = []
     for part in ms:                                       # sharp edges + open boundaries, per part
@@ -36,6 +37,56 @@ def load():
     tri = m.vertices[m.faces[f]]
     P = tri[:, 0] + uv[:, :1] * (tri[:, 1] - tri[:, 0]) + uv[:, 1:] * (tri[:, 2] - tri[:, 0])
     return P, m.face_normals[f], E
+
+def load_outline():
+    """the outline look: the solid outer body (no insides), its creases, the screen frame on the front face, the caps"""
+    body = trimesh.load(os.path.join(XMU, "xmu_body.stl"))
+    front = trimesh.load(os.path.join(XMU, "xmu_front.stl"))
+    caps = [trimesh.load(c) for c in CAPS]
+    fixed = []
+    for m, ang in [(body, 35)] + [(c, 50) for c in caps]:
+        fixed.append(m.vertices[m.face_adjacency_edges[m.face_adjacency_angles > math.radians(ang)]])
+    fe = front.vertices[front.face_adjacency_edges[front.face_adjacency_angles > math.radians(35)]]
+    sx = (np.abs(fe[..., 0]) < 13.5) & (fe[..., 1] > 29) & (fe[..., 1] < 57) & (fe[..., 2] > 2.0)   # the window and its bevel
+    fixed.append(fe[sx.all(1)])
+    sil = [body] + caps                                   # these get their silhouettes worked out per view
+    return np.concatenate(fixed), sil
+
+def silhouette(m, R):
+    """edges between a face turned towards the camera and one turned away (the camera 160 mm out on +z)"""
+    V = (m.vertices - CENTRE) @ R.T
+    n = m.face_normals @ R.T; c = V[m.faces].mean(1)
+    facing = (n * (np.array([0, 0, 160.0]) - c)).sum(1) > 0
+    a = m.face_adjacency
+    return m.vertices[m.face_adjacency_edges[facing[a[:, 0]] != facing[a[:, 1]]]]
+
+def render_outline(fixedE, sil, screen_bits, yaw, pitch, W, H, cx, cy, scale, t=0.0):
+    R = camera(yaw, pitch)
+    E = np.concatenate([fixedE] + [silhouette(m, R) for m in sil])
+    e2, eV = project(E, R, cx, cy, scale)
+    lines = Image.new("F", (W, H), 0.0); d = ImageDraw.Draw(lines)
+    depth = eV[..., 2].mean(1); near = (depth - depth.min()) / (np.ptp(depth) + 1e-6)
+    for (a, b), k in zip(e2, near):
+        d.line([tuple(a), tuple(b)], fill=float(0.55 + 0.45 * k), width=2)
+    L = np.asarray(lines)
+    S = screen_layer(screen_bits, R, W, H, cx, cy, scale)
+    core = np.clip(L * 0.9 + S * 1.35, 0, 3)
+    img = core + gaussian_filter(core, 5) * 1.6
+    rows = np.arange(H)[:, None]
+    img = img * (0.72 + 0.28 * ((rows % 3) != 0))
+    band = np.exp(-(((rows - (t * H * 1.3) % (H * 1.3)) / 9.0) ** 2)) * 0.5
+    return img * (1 + band) * (0.94 + 0.06 * math.sin(t * 40))
+
+def screen_layer(screen_bits, R, W, H, cx, cy, scale):
+    scr = Image.new("F", (W, H), 0.0); ds = ImageDraw.Draw(scr)
+    sx = (SCREEN["x1"] - SCREEN["x0"]) / 64; sy = (SCREEN["y1"] - SCREEN["y0"]) / 64
+    for j in range(64):
+        for i in range(64):
+            if not screen_bits[j, i]: continue
+            x, y = SCREEN["x0"] + i * sx, SCREEN["y1"] - j * sy
+            q = np.array([[x, y, SCREEN["z"]], [x + sx * .9, y, SCREEN["z"]], [x + sx * .9, y - sy * .9, SCREEN["z"]], [x, y - sy * .9, SCREEN["z"]]])
+            q2, _ = project(q, R, cx, cy, scale); ds.polygon([tuple(v) for v in q2], fill=1.0)
+    return np.asarray(scr)
 
 def camera(yaw, pitch):
     cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
@@ -120,6 +171,7 @@ def world_background(W=640, H=480):            # world.c's background: the gradi
     return np.asarray(im).astype(float)
 
 def main():
+    global CENTRE
     os.makedirs(OUT, exist_ok=True)
     shot = np.asarray(Image.open(SHOT).convert("RGB")).astype(float)
     bits = (shot[189:189 + 192:3, 224:224 + 192:3, 1] > 128).astype(np.uint8)     # the VMX picture in the screenshot
@@ -135,7 +187,6 @@ def main():
         return im
     frame(math.radians(-24), math.radians(-12), 0.15).save(os.path.join(OUT, "play_hologram.png")); print("play_hologram.png")
     # while playing: the head fills the view, the screen at about 3 TV pixels per VMX pixel, the body fading into the beam
-    global CENTRE
     CENTRE = np.array([0.0, 43.0, 0.0])
     holo = render(P, N, E, bits, math.radians(-14), math.radians(-8), W, H, 320, 250, 9.4, 0.2)
     yy = np.arange(H)[:, None]; holo = holo * np.clip((440 - yy) / 120.0, 0.15, 1)
@@ -145,6 +196,25 @@ def main():
     # a close-up, bigger, on black
     holo = render(P, N, E, bits, math.radians(-30), math.radians(-14), 640, 640, 320, 330, 8.5, 0.3)
     Image.fromarray(np.clip(tint(holo + projector(640, 640, 320, 610) * 1.2), 0, 255).astype(np.uint8)).save(os.path.join(OUT, "closeup.png")); print("closeup.png")
+    # the outline-only look: the same three views
+    FE, SIL = load_outline(); print(len(FE), "fixed outline edges")
+    def oframe(yaw, pitch, t):
+        holo = render_outline(FE, SIL, bits, yaw, pitch, W, H, 320, 255, 4.8, t)
+        return Image.fromarray(np.clip(base + tint(holo + proj), 0, 255).astype(np.uint8))
+    oframe(math.radians(-24), math.radians(-12), 0.15).save(os.path.join(OUT, "outline_play.png"))
+    CENTRE = np.array([0.0, 43.0, 0.0])
+    holo = render_outline(FE, SIL, bits, math.radians(-14), math.radians(-8), W, H, 320, 250, 9.4, 0.2)
+    yy = np.arange(H)[:, None]; holo = holo * np.clip((440 - yy) / 120.0, 0.15, 1)
+    Image.fromarray(np.clip(base + tint(holo + projector(W, H, 320, 470) * 0.8), 0, 255).astype(np.uint8)).save(os.path.join(OUT, "outline_playing.png"))
+    CENTRE = np.array([0.0, 31.0, 0.0])
+    holo = render_outline(FE, SIL, bits, math.radians(-30), math.radians(-14), 640, 640, 320, 330, 8.5, 0.3)
+    Image.fromarray(np.clip(tint(holo + projector(640, 640, 320, 610) * 1.2), 0, 255).astype(np.uint8)).save(os.path.join(OUT, "outline_closeup.png"))
+    frames = []
+    for k in range(36):
+        a = k / 36 * 2 * math.pi
+        frames.append(oframe(math.radians(-24 + 22 * math.sin(a)), math.radians(-12 + 3 * math.sin(2 * a)), k / 36).resize((480, 360), Image.LANCZOS))
+    frames[0].save(os.path.join(OUT, "outline_play.gif"), save_all=True, append_images=frames[1:], duration=80, loop=0)
+    print("outline_*")
     # a turntable: it turns slowly back and forth, as it would idle in PLAY
     frames = []
     for k in range(36):
