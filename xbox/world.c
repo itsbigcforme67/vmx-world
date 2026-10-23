@@ -8,6 +8,18 @@
 #include "../../vmx-firmware/core/vmxfw.h"
 #include "hdd.h"
 #include "holo.h"
+// ---- the hologram look (DESIGN.md "The look on the Xbox side"): the kit lives in FOLD's gfx.c, shared with FOLD BUILDER
+#define HG GFX_HG
+#define HG_DIM GFX_HG_DIM
+#define HG_EDGE GFX_HG_EDGE
+#define mixc gfx_mix
+#define add_rect gfx_add_rect
+#define glass gfx_glass
+#define brackets gfx_brackets
+#define gtext gfx_gtext
+#define hpanel gfx_hpanel
+#define hsel gfx_hsel
+#define post gfx_post
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +56,6 @@ static int haveHolo;                                    // the skeleton hologram
 static void toast(const char *m) { snprintf(W.toast, sizeof W.toast, "%s", m); W.toastT = 75; }
 
 // ---- small drawing helpers
-static void add_rect(int x, int y, int w, int h, uint32_t c);
 static void card(int x, int y, int s, const uint8_t *c, uint32_t on, uint32_t off) {
   if (off == 0xff000000u) for (int j = 0; j < 24; j++) for (int i = 0; i < 24; i++)   // a glow under the picture
     if ((c[j * 3 + i / 8] >> (7 - i % 8)) & 1) add_rect(x + i * s - s, y + j * s - s, 3 * s, 3 * s, 0x020a04);
@@ -64,65 +75,6 @@ static int wrap(int x, int y, int w, int scale, uint32_t c, const char *s, int m
 }
 static void upper(char *s) { for (; *s; s++) if (*s >= 'a' && *s <= 'z') *s -= 32; }
 
-// ---- the hologram look for World's own screens (DESIGN.md "The look on the Xbox side"): glass panels with glowing
-// edges and corner brackets, glowing text, lit selections, and one pass of scanlines and a rolling band at the end
-#define HG 0x5dff7e                                     // hologram green, its dim edge, its glass tint
-#define HG_DIM 0x1f6a34
-#define HG_EDGE 0x2c9a4a
-static uint32_t mixc(uint32_t a, uint32_t b, int k) {  // k/256 of b over a
-  int r = (int)((a >> 16) & 255) + ((((int)((b >> 16) & 255)) - (int)((a >> 16) & 255)) * k >> 8);
-  int g = (int)((a >> 8) & 255) + ((((int)((b >> 8) & 255)) - (int)((a >> 8) & 255)) * k >> 8);
-  int bl = (int)(a & 255) + ((((int)(b & 255)) - (int)(a & 255)) * k >> 8);
-  return (uint32_t)(r << 16 | g << 8 | bl);
-}
-static void add_rect(int x, int y, int w, int h, uint32_t c) {   // additive light
-  for (int j = y < 0 ? 0 : y; j < y + h && j < GH; j++) for (int i = x < 0 ? 0 : x; i < x + w && i < GW; i++) {
-    uint32_t p = gfx_px[j * GW + i];
-    int r = (int)((p >> 16) & 255) + (int)((c >> 16) & 255), g = (int)((p >> 8) & 255) + (int)((c >> 8) & 255), bl = (int)(p & 255) + (int)(c & 255);
-    gfx_px[j * GW + i] = (uint32_t)((r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 | (bl > 255 ? 255 : bl));
-  }
-}
-static void glass(int x, int y, int w, int h) {          // see-through dark green glass over what's behind
-  for (int j = y < 0 ? 0 : y; j < y + h && j < GH; j++) for (int i = x < 0 ? 0 : x; i < x + w && i < GW; i++) {
-    uint32_t p = gfx_px[j * GW + i];
-    gfx_px[j * GW + i] = (((p >> 16) & 255) * 5 / 16 + 2) << 16 | (((p >> 8) & 255) * 5 / 16 + 12) << 8 | ((p & 255) * 5 / 16 + 6);
-  }
-}
-static void brackets(int x, int y, int w, int h, uint32_t c, int len) {   // bright corner brackets
-  gfx_rect(x, y, len, 2, c); gfx_rect(x, y, 2, len, c); gfx_rect(x + w - len, y, len, 2, c); gfx_rect(x + w - 2, y, 2, len, c);
-  gfx_rect(x, y + h - 2, len, 2, c); gfx_rect(x, y + h - len, 2, len, c); gfx_rect(x + w - len, y + h - 2, len, 2, c); gfx_rect(x + w - 2, y + h - len, 2, len, c);
-}
-static void gtext(int x, int y, int scale, uint32_t c, const char *s) {  // text with a soft glow round it
-  uint32_t g = mixc(0x000000, c, 70);
-  gfx_text5(x - 1, y, scale, g, s); gfx_text5(x + 1, y, scale, g, s); gfx_text5(x, y - 1, scale, g, s); gfx_text5(x, y + 1, scale, g, s);
-  gfx_text5(x, y, scale, c, s);
-}
-static void hpanel(int x, int y, int w, int h, const char *title, uint32_t accent) {
-  glass(x, y, w, h);
-  gfx_frame(x, y, w, h, mixc(0x000000, accent, 110));
-  brackets(x - 1, y - 1, w + 2, h + 2, accent, 14);
-  if (title) {
-    gtext(x + 14, y + 10, 2, accent, title);
-    for (int i = 0; i < w - 28; i++) gfx_rect(x + 14 + i, y + 30, 1, 1, mixc(0x000000, accent, 255 - i * 255 / (w - 28)));   // a line that fades out
-  }
-}
-static void hsel(int x, int y, int w, int h, int focused) {   // a lit row: a bright bar and a sweep of light that fades right
-  for (int i = 0; i < w; i++) { int k = focused ? 110 - i * 90 / w : 40 - i * 30 / w; add_rect(x + i, y, 1, h, (uint32_t)((k / 6) << 16 | k << 8 | (k / 3))); }
-  gfx_rect(x, y, 3, h, focused ? HG : HG_EDGE);
-  if (focused) { gfx_rect(x, y, w, 1, HG_EDGE); gfx_rect(x, y + h - 1, w, 1, HG_EDGE); }
-}
-static void post(int t) {                               // scanlines and the slow rolling band, over everything
-  int band = (t * 2) % (GH + 120) - 60;
-  for (int y = 0; y < GH; y++) {
-    int d = y - band, mul = (y % 3 == 0) ? 200 : 256; if (d > -12 && d < 12) mul += (12 - (d < 0 ? -d : d)) * 3;
-    if (mul == 256) continue;
-    uint32_t *p = gfx_px + y * GW;
-    for (int x = 0; x < GW; x++) {
-      uint32_t c = p[x]; int r = (int)((c >> 16) & 255) * mul >> 8, g = (int)((c >> 8) & 255) * mul >> 8, b = (int)(c & 255) * mul >> 8;
-      p[x] = (uint32_t)((r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 | (b > 255 ? 255 : b));
-    }
-  }
-}
 
 // the background (a dark green gradient and a grid floor), drawn once into its own picture and copied in each frame.
 // (Not gfx_gradient: with the Xbox's GPU that goes under the picture instead of into it, and the VMX render's soft
