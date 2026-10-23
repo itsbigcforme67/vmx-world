@@ -237,5 +237,9 @@ the glass hides the insides so the VMX's live picture reads; bloom, scanlines, a
 flicker, and a projector disc with a beam under it. Preferred over the outline-only version.
 - Built: World's PLAY (xbox/holo.c; data tools/hologram_export.py -> xbox/assets/vmx_holo.bin; preview and
   comparison images tools/hologram_preview.py -> docs/hologram/).
+- World's own screens follow it too (2026-10-23, xbox/world.c's hologram kit): glass panels (the background seen
+  darkened and tinted green through them) with glowing edges and bright corner brackets, glowing titles with a fading
+  rule, lit selections (a bright bar and a sweep of light), projected slanted tabs, game cards glowing on a projector
+  line, an amber version for VMX CASINO, and one pass of scanlines and a slow rolling band over the whole screen.
 - To follow (same look): other VMX things on the Xbox: MY VMX / GET GAMES details, applets' VMX windows (FOLD
   BUILDER's VMX popup), retail World Kits, loading and boot screens.

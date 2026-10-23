@@ -283,7 +283,7 @@ void holo_draw(int view, int t, const uint8_t *bits, int screenOn) {
   float band = (float)fmod(t / 30.0 * 0.6, 1.3) * GH, flick = 0.94f + 0.06f * sinf(t * 1.3f);
   for (int y = 0; y < v->h; y++) {
     int Y = y + v->y0; if (Y < 0 || Y >= GH) continue;
-    float d = (Y - band) / 9.0f, row = ((Y % 3) ? 1.0f : 0.72f) * (1 + 0.5f * expf(-d * d)) * flick;
+    float d = (Y - band) / 9.0f, row = (1 + 0.5f * expf(-d * d)) * flick;   // (the scanlines: World's post pass)
     int mul = (int)(row * 256);
     uint32_t *px = gfx_px + Y * GW + v->x0; const uint8_t *cr = c + y * v->w, *br = b + y * v->w, *sr = scr + y * v->w;
     for (int x = 0; x < v->w; x++) {

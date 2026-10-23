@@ -44,7 +44,10 @@ static int haveHolo;                                    // the skeleton hologram
 static void toast(const char *m) { snprintf(W.toast, sizeof W.toast, "%s", m); W.toastT = 75; }
 
 // ---- small drawing helpers
+static void add_rect(int x, int y, int w, int h, uint32_t c);
 static void card(int x, int y, int s, const uint8_t *c, uint32_t on, uint32_t off) {
+  if (off == 0xff000000u) for (int j = 0; j < 24; j++) for (int i = 0; i < 24; i++)   // a glow under the picture
+    if ((c[j * 3 + i / 8] >> (7 - i % 8)) & 1) add_rect(x + i * s - s, y + j * s - s, 3 * s, 3 * s, 0x020a04);
   for (int j = 0; j < 24; j++) for (int i = 0; i < 24; i++) {
     int b = (c[j * 3 + i / 8] >> (7 - i % 8)) & 1;
     if (b || off != 0xff000000u) gfx_rect(x + i * s, y + j * s, s, s, b ? on : off);
@@ -60,6 +63,66 @@ static int wrap(int x, int y, int w, int scale, uint32_t c, const char *s, int m
   return lines;
 }
 static void upper(char *s) { for (; *s; s++) if (*s >= 'a' && *s <= 'z') *s -= 32; }
+
+// ---- the hologram look for World's own screens (DESIGN.md "The look on the Xbox side"): glass panels with glowing
+// edges and corner brackets, glowing text, lit selections, and one pass of scanlines and a rolling band at the end
+#define HG 0x5dff7e                                     // hologram green, its dim edge, its glass tint
+#define HG_DIM 0x1f6a34
+#define HG_EDGE 0x2c9a4a
+static uint32_t mixc(uint32_t a, uint32_t b, int k) {  // k/256 of b over a
+  int r = (int)((a >> 16) & 255) + ((((int)((b >> 16) & 255)) - (int)((a >> 16) & 255)) * k >> 8);
+  int g = (int)((a >> 8) & 255) + ((((int)((b >> 8) & 255)) - (int)((a >> 8) & 255)) * k >> 8);
+  int bl = (int)(a & 255) + ((((int)(b & 255)) - (int)(a & 255)) * k >> 8);
+  return (uint32_t)(r << 16 | g << 8 | bl);
+}
+static void add_rect(int x, int y, int w, int h, uint32_t c) {   // additive light
+  for (int j = y < 0 ? 0 : y; j < y + h && j < GH; j++) for (int i = x < 0 ? 0 : x; i < x + w && i < GW; i++) {
+    uint32_t p = gfx_px[j * GW + i];
+    int r = (int)((p >> 16) & 255) + (int)((c >> 16) & 255), g = (int)((p >> 8) & 255) + (int)((c >> 8) & 255), bl = (int)(p & 255) + (int)(c & 255);
+    gfx_px[j * GW + i] = (uint32_t)((r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 | (bl > 255 ? 255 : bl));
+  }
+}
+static void glass(int x, int y, int w, int h) {          // see-through dark green glass over what's behind
+  for (int j = y < 0 ? 0 : y; j < y + h && j < GH; j++) for (int i = x < 0 ? 0 : x; i < x + w && i < GW; i++) {
+    uint32_t p = gfx_px[j * GW + i];
+    gfx_px[j * GW + i] = (((p >> 16) & 255) * 5 / 16 + 2) << 16 | (((p >> 8) & 255) * 5 / 16 + 12) << 8 | ((p & 255) * 5 / 16 + 6);
+  }
+}
+static void brackets(int x, int y, int w, int h, uint32_t c, int len) {   // bright corner brackets
+  gfx_rect(x, y, len, 2, c); gfx_rect(x, y, 2, len, c); gfx_rect(x + w - len, y, len, 2, c); gfx_rect(x + w - 2, y, 2, len, c);
+  gfx_rect(x, y + h - 2, len, 2, c); gfx_rect(x, y + h - len, 2, len, c); gfx_rect(x + w - len, y + h - 2, len, 2, c); gfx_rect(x + w - 2, y + h - len, 2, len, c);
+}
+static void gtext(int x, int y, int scale, uint32_t c, const char *s) {  // text with a soft glow round it
+  uint32_t g = mixc(0x000000, c, 70);
+  gfx_text5(x - 1, y, scale, g, s); gfx_text5(x + 1, y, scale, g, s); gfx_text5(x, y - 1, scale, g, s); gfx_text5(x, y + 1, scale, g, s);
+  gfx_text5(x, y, scale, c, s);
+}
+static void hpanel(int x, int y, int w, int h, const char *title, uint32_t accent) {
+  glass(x, y, w, h);
+  gfx_frame(x, y, w, h, mixc(0x000000, accent, 110));
+  brackets(x - 1, y - 1, w + 2, h + 2, accent, 14);
+  if (title) {
+    gtext(x + 14, y + 10, 2, accent, title);
+    for (int i = 0; i < w - 28; i++) gfx_rect(x + 14 + i, y + 30, 1, 1, mixc(0x000000, accent, 255 - i * 255 / (w - 28)));   // a line that fades out
+  }
+}
+static void hsel(int x, int y, int w, int h, int focused) {   // a lit row: a bright bar and a sweep of light that fades right
+  for (int i = 0; i < w; i++) { int k = focused ? 110 - i * 90 / w : 40 - i * 30 / w; add_rect(x + i, y, 1, h, (uint32_t)((k / 6) << 16 | k << 8 | (k / 3))); }
+  gfx_rect(x, y, 3, h, focused ? HG : HG_EDGE);
+  if (focused) { gfx_rect(x, y, w, 1, HG_EDGE); gfx_rect(x, y + h - 1, w, 1, HG_EDGE); }
+}
+static void post(int t) {                               // scanlines and the slow rolling band, over everything
+  int band = (t * 2) % (GH + 120) - 60;
+  for (int y = 0; y < GH; y++) {
+    int d = y - band, mul = (y % 3 == 0) ? 200 : 256; if (d > -12 && d < 12) mul += (12 - (d < 0 ? -d : d)) * 3;
+    if (mul == 256) continue;
+    uint32_t *p = gfx_px + y * GW;
+    for (int x = 0; x < GW; x++) {
+      uint32_t c = p[x]; int r = (int)((c >> 16) & 255) * mul >> 8, g = (int)((c >> 8) & 255) * mul >> 8, b = (int)(c & 255) * mul >> 8;
+      p[x] = (uint32_t)((r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 | (b > 255 ? 255 : b));
+    }
+  }
+}
 
 // the background (a dark green gradient and a grid floor), drawn once into its own picture and copied in each frame.
 // (Not gfx_gradient: with the Xbox's GPU that goes under the picture instead of into it, and the VMX render's soft
@@ -78,19 +141,26 @@ static void background(void) {
   memcpy(gfx_px, bgPx, sizeof bgPx);
 }
 static void header(void) {
-  gfx_text5(40, 24, 3, 0xffffff, "VMX"); gfx_text5(40 + gfx_text5_w(3, "VMX ") , 24, 3, LIT, "WORLD");
+  gtext(40, 24, 3, 0xe8ffe8, "VMX"); gtext(40 + gfx_text5_w(3, "VMX "), 24, 3, HG, "WORLD");
+  add_rect(40, 48, gfx_text5_w(3, "VMX WORLD"), 1, 0x1a5a28);
   char b[64]; int blocks = 0; for (int i = 0; i < NINSTALLED; i++) blocks += (INSTALLED[i].bytes + 16383) / 16384;
   snprintf(b, sizeof b, "%d GAMES ON THE HARD DISK  %d BLOCKS", NINSTALLED, blocks);
   gfx_disc(600 - gfx_text5_w(1, b) - 12, 33, 4, LIT); gfx_text5(600 - gfx_text5_w(1, b), 30, 1, INK, b);
 }
-static void tabs(void) {
+static void tabs(void) {                                 // projected tabs: slanted outlines; the open one lit
   int x = 32, y = 62, w = 96;
-  gfx_rect(0, y + 26, 640, 2, 0x3a4a3a);
+  for (int i = 0; i < 640; i++) gfx_rect(i, y + 27, 1, 1, mixc(0x000000, HG_EDGE, 255 - (i > 320 ? i - 320 : 320 - i) * 255 / 340));
   for (int i = 0; i < NTABS; i++, x += w + 2) {
-    int on = i == W.tab; uint32_t c = on ? GREEN : 0x18221a;
-    for (int j = 0; j < 26; j++) gfx_rect(x + (26 - j) / 3, y + j, w - 8, 1, c);       // a slanted tab
-    if (on && W.zone == 0) gfx_frame(x - 2, y - 2, w - 2, 30, LIT);
-    gfx_text5(x + 4 + (w - 8 - gfx_text5_w(1, TABS[i])) / 2, y + 10, 1, on ? 0xffffff : MUTED, TABS[i]);
+    int on = i == W.tab;
+    for (int j = 0; j < 26; j++) {
+      int sx = x + (26 - j) / 3, sw = w - 8;
+      if (on) add_rect(sx, y + j, sw, 1, (uint32_t)((4 + j / 3) << 16 | (30 + j * 2) << 8 | (10 + j)));
+      gfx_rect(sx, y + j, 1, 1, on ? HG : HG_DIM); gfx_rect(sx + sw - 1, y + j, 1, 1, on ? HG : HG_DIM);
+    }
+    gfx_rect(x + 8, y, w - 8, 1, on ? HG : HG_DIM);
+    if (on && W.zone == 0) brackets(x - 2, y - 3, w + 2, 32, HG, 6);
+    if (on) gtext(x + 4 + (w - 8 - gfx_text5_w(1, TABS[i])) / 2, y + 10, 1, 0xffffff, TABS[i]);
+    else gfx_text5(x + 4 + (w - 8 - gfx_text5_w(1, TABS[i])) / 2, y + 10, 1, MUTED, TABS[i]);
   }
 }
 static void hints(const char *a, const char *b, const char *y) {
@@ -102,12 +172,12 @@ static void hints(const char *a, const char *b, const char *y) {
 }
 // a list of rows (left panel); returns nothing; row(i, x, y, w, selected) draws one
 static void list(int x, int y, int w, int h, int n, int sel, void (*row)(int, int, int, int, int)) {
-  gfx_panel(x, y, w, h, NULL, LIT);
+  hpanel(x, y, w, h, NULL, HG);
   int rh = 30, vis = (h - 12) / rh, top = sel - vis / 2; if (top > n - vis) top = n - vis; if (top < 0) top = 0;
   for (int i = top; i < n && i < top + vis; i++) {
     int ry = y + 6 + (i - top) * rh, s = i == sel && W.zone == 1;
-    if (i == sel) gfx_rect(x + 6, ry, w - 12, rh - 2, s ? GREEN : 0x1c2a1c);
-    if (s) gfx_frame(x + 6, ry, w - 12, rh - 2, LIT);
+    if (i == sel) hsel(x + 6, ry, w - 12, rh - 2, s);
+    else gfx_rect(x + 12, ry + rh - 2, w - 24, 1, 0x0e2a16);    // a faint rule between rows
     row(i, x + 12, ry, w - 24, i == sel);
   }
   if (!n) gfx_text5(x + 16, y + 20, 1, MUTED, "NOTHING HERE YET");
@@ -124,7 +194,7 @@ static const char *NEWS[][3] = {
 static void news_row(int i, int x, int y, int w, int sel) { gfx_text5(x, y + 3, 1, MUTED, NEWS[i][0]); gfx_text5(x, y + 14, 1, INK, NEWS[i][1]); }
 static void draw_news(void) {
   list(32, 100, 230, 330, NNEWS, W.sel[T_NEWS], news_row);
-  int i = W.sel[T_NEWS]; gfx_panel(276, 100, 332, 330, NEWS[i][1], LIT);
+  int i = W.sel[T_NEWS]; hpanel(276, 100, 332, 330, NEWS[i][1], LIT);
   gfx_text5(292, 142, 1, MUTED, NEWS[i][0]);
   char b[400]; snprintf(b, sizeof b, "%s", NEWS[i][2]); upper(b); wrap(292, 162, 300, 1, INK, b, 26);
   hints(NULL, "BACK", NULL);
@@ -138,8 +208,10 @@ static void shop_row(int i, int x, int y, int w, int sel) {
   gfx_text5(x + 32, y + 15, 1, hdd_installed(v->id) >= 0 ? LIT : MUTED, st);
 }
 static void draw_detail(const Vxp *v, int y0) {
-  gfx_panel(276, 100, 332, 330, v->title, LIT);
-  gfx_rect(292, 140, 24 * 4 + 8, 24 * 4 + 8, 0x060a05); card(296, 144, 4, v->card, LIT, 0x060a05);
+  hpanel(276, 100, 332, 330, v->title, LIT);
+  for (int k = 8; k > 0; k--) add_rect(296 + 48 - k * 6, 248 - k, k * 12, 2, 0x020c05);    // its projector, under it
+  gfx_rect(296, 247, 96, 1, HG_EDGE);
+  card(296, 144, 4, v->card, HG, 0xff000000u);
   char b[220]; snprintf(b, sizeof b, "%s", v->pub); upper(b); gfx_text5(404, 146, 1, MUTED, b);
   snprintf(b, sizeof b, "%d BLOCK%s", (v->bytes + 16383) / 16384, (v->bytes + 16383) / 16384 == 1 ? "" : "S"); gfx_text5(404, 160, 1, MUTED, b);
   snprintf(b, sizeof b, "ID %08X", (unsigned)v->id); gfx_text5(404, 174, 1, MUTED, b);
@@ -149,7 +221,7 @@ static void draw_detail(const Vxp *v, int y0) {
 }
 static void draw_shop(void) {
   list(32, 100, 230, 330, NCATALOG, W.sel[T_SHOP], shop_row);
-  if (!NCATALOG) { gfx_panel(276, 100, 332, 330, "NO CATALOGUE", LIT); wrap(292, 146, 300, 1, INK, "THIS DISC HAS NO GAMES IN CATALOG. ON THE REAL SERVICE THEY CAME OVER XBOX LIVE.", 6); hints(NULL, "BACK", NULL); return; }
+  if (!NCATALOG) { hpanel(276, 100, 332, 330, "NO CATALOGUE", LIT); wrap(292, 146, 300, 1, INK, "THIS DISC HAS NO GAMES IN CATALOG. ON THE REAL SERVICE THEY CAME OVER XBOX LIVE.", 6); hints(NULL, "BACK", NULL); return; }
   const Vxp *v = &CATALOG[W.sel[T_SHOP]]; draw_detail(v, 0);
   int have = hdd_installed(v->id) >= 0;
   if (W.dl && W.dlId == v->id) {
@@ -167,12 +239,12 @@ static void mine_row(int i, int x, int y, int w, int sel) {
 }
 static void draw_mine(void) {
   list(32, 100, 230, 330, NINSTALLED, W.sel[T_MINE], mine_row);
-  if (!NINSTALLED) { gfx_panel(276, 100, 332, 330, "MY VMX", LIT); wrap(292, 146, 300, 1, INK, "NO VMX GAMES ON THE HARD DISK YET. GET SOME IN GET GAMES.", 6); hints(NULL, "BACK", NULL); return; }
+  if (!NINSTALLED) { hpanel(276, 100, 332, 330, "MY VMX", LIT); wrap(292, 146, 300, 1, INK, "NO VMX GAMES ON THE HARD DISK YET. GET SOME IN GET GAMES.", 6); hints(NULL, "BACK", NULL); return; }
   draw_detail(&INSTALLED[W.sel[T_MINE]], 0);
   char b[80]; snprintf(b, sizeof b, "UDATA\\56580001\\%08X0000", (unsigned)INSTALLED[W.sel[T_MINE]].id); gfx_text5(292, 378, 1, MUTED, b);
   gfx_text5(292, 392, 1, 0xffffff, "A: PLAY OR DELETE");
   if (W.menu) {
-    gfx_dim(0, 0, 640, 480, 0.6f); gfx_panel(200, 180, 240, 110, INSTALLED[W.sel[T_MINE]].title, LIT);
+    gfx_dim(0, 0, 640, 480, 0.95f); hpanel(200, 180, 240, 110, INSTALLED[W.sel[T_MINE]].title, HG);
     const char *items[2] = { "PLAY ON THE TV", "DELETE FROM THE HARD DISK" };
     for (int i = 0; i < 2; i++) { int y = 222 + i * 26; if (i == W.menuSel) gfx_rect(212, y - 6, 216, 20, GREEN); gfx_text5(222, y, 1, INK, items[i]); }
     hints("SELECT", "CANCEL", NULL); return;
@@ -233,7 +305,7 @@ static void draw_play(void) {
     gfx_text5(320 - gfx_text5_w(1, m) / 2, 418, 1, MUTED, m);
     hints(NULL, NULL, "BACK TO WORLD");
   } else {
-    gfx_panel(276, 100, 332, 330, "YOUR VMX", LIT);
+    hpanel(276, 100, 332, 330, "YOUR VMX", LIT);
     if (haveHolo) holo_draw(HOLO_LIST, W.t, vmx_screen(), vmx_on()); else draw_vmx(378, 196, 2);
     wrap(292, 372, 300, 1, MUTED, "THE VMX RUNS ON THE TV WITH EVERY GAME ON THE HARD DISK. ITS SAVES, SCORES AND CHIPS STAY ON THE HARD DISK.", 4);
     hints("TURN ON THE VMX", "BACK", NULL);
@@ -264,7 +336,7 @@ static void draw_scores(void) {
   list(32, 100, 230, 330, nscores(), W.sel[T_SCORES], scores_row);
   int i = W.sel[T_SCORES]; char b[80];
   if (i == NINSTALLED) {
-    gfx_panel(276, 100, 332, 330, "VMX CASINO CHIPS", GOLD);
+    hpanel(276, 100, 332, 330, "VMX CASINO CHIPS", GOLD);
     int chips = haveBank ? bank.chips : 100;
     snprintf(b, sizeof b, "%d", chips); gfx_text5(292, 150, 4, GOLD, b); gfx_text5(292 + gfx_text5_w(4, b) + 10, 168, 1, MUTED, "CHIPS");
     snprintf(b, sizeof b, "MOST EVER HELD  %d", haveBank ? (int)bank.peak : 100); gfx_text5(292, 210, 1, INK, b);
@@ -272,7 +344,7 @@ static void draw_scores(void) {
     snprintf(b, sizeof b, "STAKED / PAID   %d / %d", haveBank ? (int)bank.staked : 0, haveBank ? (int)bank.paid : 0); gfx_text5(292, 242, 1, INK, b);
     wrap(292, 280, 300, 1, MUTED, "SCORE RECORD 56581F00. THE NATIONAL TABLES NEED THE SCORE SERVICE (NOT RUNNING YET).", 5);
   } else if (NINSTALLED) {
-    const Vxp *v = &INSTALLED[i]; gfx_panel(276, 100, 332, 330, v->title, LIT);
+    const Vxp *v = &INSTALLED[i]; hpanel(276, 100, 332, 330, v->title, LIT);
     const VmxRec *r = rec_of(v->id);
     if (!r || !(r->best || r->w || r->l || r->d)) gfx_text5(292, 150, 1, MUTED, "NO SCORE YET: PLAY IT IN PLAY");
     else if (r->w || r->l || r->d) { snprintf(b, sizeof b, "WON %d  LOST %d  DRAWN %d", (int)r->w, (int)r->l, (int)r->d); gfx_text5(292, 150, 2, INK, b); }
@@ -301,33 +373,33 @@ static void applet_row(int i, int x, int y, int w, int sel) {
   gfx_text5(x, y + 15, 1, MUTED, i == 0 ? (hdd_exists(FOLD_XBE) ? "ON THE HARD DISK" : "NOT INSTALLED") : "FOR CASINO CHIPS");
 }
 static void draw_cashier(void) {
-  gfx_dim(0, 0, 640, 480, 0.75f);
-  gfx_panel(40, 70, 560, 360, "VMX CASINO - CASHIER", GOLD);
+  gfx_dim(0, 0, 640, 480, 0.97f);
+  hpanel(40, 70, 560, 360, "VMX CASINO - CASHIER", GOLD);
   char b[96]; snprintf(b, sizeof b, "%d", haveBank ? (int)bank.chips : 100);
   gfx_text5(60, 116, 1, MUTED, "YOUR STASH"); gfx_text5(60, 128, 3, GOLD, b); gfx_text5(64 + gfx_text5_w(3, b), 142, 1, MUTED, "CHIPS");
   gfx_text5(60, 172, 1, MUTED, "XBOX GAMES THE CASHIER KNOWS");
   for (int i = 0; i < NCASH; i++) {
     int y = 190 + i * 30, n = hdd_title_saves(CASH[i].id);
-    if (i == W.appSel) gfx_rect(56, y - 6, 300, 26, 0x2a3a1c);
+    if (i == W.appSel) hsel(56, y - 6, 300, 26, 1);
     gfx_text5(64, y, 1, INK, CASH[i].name);
     snprintf(b, sizeof b, n ? "%d SAVE%s ON THIS XBOX" : "NOT ON THIS XBOX", n, n == 1 ? "" : "S"); gfx_text5(64, y + 10, 1, n ? LIT : MUTED, b);
   }
   int i = W.appSel;
-  gfx_rect(372, 186, 212, 200, 0xe9e2cc);
-  gfx_text5(382, 196, 1, 0x2b2416, CASH[i].name);
-  snprintf(b, sizeof b, "1 CHIP = %s%d%s", CASH[i].sym, CASH[i].per, CASH[i].unit); gfx_text5(382, 214, 1, 0x2b2416, b);
-  snprintf(b, sizeof b, "UDATA\\%s", CASH[i].tid); gfx_text5(382, 230, 1, 0x6c6044, b);
-  wrap(382, 256, 196, 1, 0x4a4030, "EDITING THIS GAME'S SAVE ISN'T READY YET: THE SAVE TOOL COMES FIRST ON THE PC (DOCS/CASINO.MD). YOUR CHIPS STAY ON YOUR VMX.", 10);
+  glass(372, 186, 212, 200); add_rect(372, 186, 212, 200, 0x0c0800); brackets(372, 186, 212, 200, GOLD, 10);   // an amber slip
+  gtext(382, 196, 1, GOLD, CASH[i].name);
+  snprintf(b, sizeof b, "1 CHIP = %s%d%s", CASH[i].sym, CASH[i].per, CASH[i].unit); gfx_text5(382, 214, 1, 0xf2dc9a, b);
+  snprintf(b, sizeof b, "UDATA\\%s", CASH[i].tid); gfx_text5(382, 230, 1, 0x9a8650, b);
+  wrap(382, 256, 196, 1, 0xc8b47a, "EDITING THIS GAME'S SAVE ISN'T READY YET: THE SAVE TOOL COMES FIRST ON THE PC (DOCS/CASINO.MD). YOUR CHIPS STAY ON YOUR VMX.", 10);
   hints(NULL, "CLOSE", NULL);
 }
 static void draw_applets(void) {
   list(32, 100, 230, 330, 2, W.sel[T_APPLETS], applet_row);
   if (W.sel[T_APPLETS] == 0) {
-    gfx_panel(276, 100, 332, 330, "FOLD BUILDER", LIT);
+    hpanel(276, 100, 332, 330, "FOLD BUILDER", LIT);
     wrap(292, 146, 300, 1, INK, "BUILD FOLD ROOMS LEVELS IN 3D: FOLD THE WORKING PLANE ROUND THE SHAPE, PLACE WALLS, BOXES AND TARGETS, WIRE UP SWITCHES. COMES WITH FOLD ROOMS.", 10);
     gfx_text5(292, 392, 1, hdd_exists(FOLD_XBE) ? 0xffffff : MUTED, hdd_exists(FOLD_XBE) ? "A: START FOLD BUILDER" : "NOT ON THIS XBOX (E:\\GAMES\\FOLD)");
   } else {
-    gfx_panel(276, 100, 332, 330, "VMX CASINO CASHIER", GOLD);
+    hpanel(276, 100, 332, 330, "VMX CASINO CASHIER", GOLD);
     wrap(292, 146, 300, 1, INK, "CASH YOUR VMX CASINO CHIPS IN FOR MONEY IN YOUR XBOX GAMES. EACH GAME HAS ITS OWN RATE. CHIPS CASHED OUT LEAVE YOUR STASH FOR GOOD.", 10);
     gfx_text5(292, 392, 1, 0xffffff, "A: OPEN THE CASHIER");
   }
@@ -431,5 +503,6 @@ void app_draw(void) {
     case T_NEWS: draw_news(); break; case T_SHOP: draw_shop(); break; case T_MINE: draw_mine(); break;
     case T_PLAY: draw_play(); break; case T_SCORES: draw_scores(); break; case T_APPLETS: draw_applets(); break;
   }
-  if (W.toastT) { int w = gfx_text5_w(1, W.toast) + 28, x = 320 - w / 2; gfx_rect(x, 410, w, 22, 0x111d10); gfx_frame(x, 410, w, 22, LIT); gfx_text5(x + 14, 417, 1, LIT, W.toast); }
+  if (W.toastT) { int w = gfx_text5_w(1, W.toast) + 28, x = 330 - w / 2; glass(x, 22, w, 22); brackets(x, 22, w, 22, HG, 6); gtext(x + 14, 29, 1, HG, W.toast); }
+  post(W.t);
 }
