@@ -9,6 +9,7 @@ enum { HOLO_LIST, HOLO_PLAY };            // the PLAY tab's small turning VMX / 
 int  holo_load_baked(const char *path);   // the pictures made ahead of time (assets/vmx_holo.pak); 1 = loaded
 int  holo_load(const char *path);         // or the model itself (assets/vmx_holo.bin), rendered here; 1 = loaded
 int  holo_bake(const char *out);          // PC only: renders every picture and writes the .pak
+int  holo_bake_fold(const char *out, int sc, int side, int extra);   // PC only: FOLD's head-on VMX picture (vmx_small / vmx_large)
 void holo_draw(int view, int t, const uint8_t *screen, int screenOn);   // t: World's 30 Hz tick count
 void holo_prepare(void);                  // call every tick: renders the next cached picture until all are ready
 #endif
