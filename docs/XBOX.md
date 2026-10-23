@@ -12,7 +12,7 @@ Xbox for real"). The look follows `mockup/world.html`; everything in it is real 
 - **MY VMX**: what's on the VMX (or the hard disk, below); A: play it or delete it.
 - **The VMX in a controller** (xbox/vmxlink.c): a memory unit is USB mass storage on the controller's hub, so World
   registers nxdk's mass-storage driver before SDL starts USB (`app_usb_init`) and reads the VMX's FATX volume with
-  vmx-firmware/core/fatx.c. A memory unit with `56580001\VMX` on it is a VMX: while it's plugged in, MY VMX, PLAY,
+  vmx-firmware/core/fatx.c. A memory unit with `56580001\VMX.SYS` on it is a VMX: while it's plugged in, MY VMX, PLAY,
   GET GAMES' downloads and SCORES (records, casino chips) all use the VMX; unplugged, World's own copy on the hard disk.
   Plugging and unplugging is noticed while World runs ("VMX PLUGGED IN"). Another memory unit: "isn't a VMX".
 - **PLAY**: the real VMX on the TV, as a turning skeleton hologram (xbox/holo.c; DESIGN.md "The look on the Xbox
@@ -36,7 +36,7 @@ E:\Games\VMXWORLD\                      World itself (the network loader, world.
 
 World's XBE has title ID 56580001 (`tools/xbe_title_id.py` patches the certificate; cxbe can't). With no VMX plugged
 in, World's VMX lives on the hard disk. On a VMX the same folders sit at the root of its volume (a memory unit's root
-holds title folders, as UDATA does): `56580001\<ID>0000\GAME.VXP`, `56580001\VMX\*.BIN` (vmx-firmware/core/vmxvol.h).
+holds title folders, as UDATA does; vmx-firmware/core/vmxvol.h and DESIGN.md).
 
 ## Build and test
 
