@@ -1,6 +1,7 @@
 // VMX World's files: see hdd.h. One VMX game = one save folder, UDATA\56580001\<game ID>0000\ holding GAME.VXP and
 // SaveMeta.xbx ("Name=..." in UTF-16, which the dashboard's Memory screen shows), under a TitleMeta.xbx that names the
-// title "VMX World". The VMX's storage (the firmware's plat_* keys) is UDATA\56580001\VMX\<key>.BIN.
+// title "VMX World". The VMX's storage (the firmware's plat_* keys) sits where vmx-firmware/core/vmxvol.h puts it: each
+// game's save and record in its own save folder, the casino chips in one shared save, settings loose.
 // With a VMX plugged into a controller (vmxlink.c) all of that is on the VMX instead, in the same layout at the root of
 // its memory-unit volume (vmx-firmware/core/vmxvol.h): MY VMX, PLAY, installs and SCORES use it; the hard disk's copy
 // is World's own VMX for when none is plugged in. Paths starting "VMX:" are on the VMX.
@@ -144,7 +145,7 @@ void hdd_scan(void) {
 }
 int hdd_installed(uint32_t id) { for (int i = 0; i < NINSTALLED; i++) if (INSTALLED[i].id == id) return i; return -1; }
 static void save_dir(uint32_t id, char *out, int n) { snprintf(out, (size_t)n, WORLD "%08X0000", (unsigned)id); }
-int hdd_install(const Vxp *v) {
+int hdd_install(const Vxp *v) {   // (into the game's save folder: its save, if it has one, stays)
   int n = 0; uint8_t *d = hdd_read(v->path, &n); if (!d) return 0;
   if (vmxlink_vol()) { int ok = vol_install(vmxlink_vol(), v->id, v->title, d, n); free(d); hdd_scan(); return ok; }
   char dir[200], p[260]; save_dir(v->id, dir, sizeof dir); mkdir_(dir);
@@ -172,7 +173,6 @@ int hdd_title_saves(uint32_t tid) {
   char d[80]; snprintf(d, sizeof d, UDATA "%08X" SEP, (unsigned)tid); int n = 0;
   each_entry(d, count_entry, &n); return n;
 }
-const char *hdd_vmx_dir(void) { return WORLD "VMX" SEP; }
 int hdd_day(void) {
   time_t t = time(NULL); long d = (long)((t - 1005782400L) / 86400L);   // 1005782400 = 15 Nov 2001 00:00 UTC
   return t > 1005782400L && d < 65535 ? (int)d : -1;
@@ -183,7 +183,7 @@ void hdd_init(void) {
 #else
   mkdir_("build"); mkdir_("build/hdd");
 #endif
-  mkdir_(UDATA); mkdir_(UDATA "56580001"); mkdir_(WORLD "VMX");
+  mkdir_(UDATA); mkdir_(UDATA "56580001");
   hdd_log("dirs made");
   if (!hdd_exists(WORLD "TitleMeta.xbx")) write_meta(WORLD "TitleMeta.xbx", "TitleName", "VMX World");
   hdd_scan(); { char b[60]; snprintf(b, sizeof b, "catalog %d installed %d", NCATALOG, NINSTALLED); hdd_log(b); }
@@ -193,15 +193,27 @@ void hdd_init(void) {
 void *plat_alloc(size_t n) { return calloc(1, n); }
 void *plat_alloc_fast(size_t n) { return calloc(1, n); }
 int hdd_on_vmx(void) { return vmxlink_vol() != NULL; }
+// the same places as on a VMX (vmx-firmware/core/vmxvol.h's vol_key_path), under UDATA\ on the hard disk
+static void key_file(const char *key, char *out, int n, uint32_t *folder) {
+  char rel[64]; vol_key_path(key, rel, folder);
+  snprintf(out, (size_t)n, UDATA "%s", rel);
+  for (char *c = out + strlen(UDATA); *c; c++) if (*c == '\\') *c = SEP[0];
+}
 int plat_load(const char *key, void *buf, int max) {
   if (vmxlink_vol()) return vol_load(vmxlink_vol(), key, buf, max);
-  char p[200]; snprintf(p, sizeof p, "%s%s.BIN", hdd_vmx_dir(), key);
-  FILE *f = fopen(p, "rb"); if (!f) return 0;
-  int n = (int)fread(buf, 1, (size_t)max, f); fclose(f); return n;
+  char p[200]; uint32_t f; key_file(key, p, sizeof p, &f);
+  FILE *fh = fopen(p, "rb"); if (!fh) return 0;
+  int n = (int)fread(buf, 1, (size_t)max, fh); fclose(fh); return n;
 }
 void plat_save(const char *key, const void *buf, int n) {
   if (vmxlink_vol()) { vol_save(vmxlink_vol(), key, buf, n); return; }
-  char p[200]; snprintf(p, sizeof p, "%s%s.BIN", hdd_vmx_dir(), key); write_file(p, buf, n);
+  char p[200]; uint32_t f; key_file(key, p, sizeof p, &f);
+  if (!buf) { remove(p); return; }
+  if (f) {                                               // a save folder, named for the dashboard
+    char d[200], m[220]; snprintf(d, sizeof d, WORLD "%08X0000", (unsigned)f); mkdir_(d);
+    snprintf(m, sizeof m, "%s" SEP "SaveMeta.xbx", d); if (!hdd_exists(m)) write_meta(m, "Name", vol_title(f));
+  }
+  write_file(p, buf, n);
 }
 int plat_day(void) { return hdd_day(); }
 const char *plat_name(void) { return "VMX WORLD"; }

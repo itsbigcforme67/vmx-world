@@ -55,29 +55,41 @@ A VMX game's ID is used for its save folder, its scores and its applet.
 
 ### On the Xbox hard disk and on the VMX
 
-The same layout on both, because the VMX is a memory unit (FATX):
+The same layout on both, because the VMX is a memory unit (FATX). On a memory unit the title folders sit at the root;
+on the hard disk under UDATA\. Owner (2026-10-23): the dashboard shows VMX World; inside it are your VMX games, each
+with its save; the casino games share a second save, the chip stash, written once however many casino games you add;
+applets are World's downloadable content and always live on the hard disk.
 
 ```
-UDATA\56580001\                      VMX World
+UDATA\56580001\                      VMX World ("VMX World" in the dashboard's Memory screen)
     TitleMeta.xbx                    "TitleName=VMX World"
-    TitleImage.xbx                   the World icon
-    565810010000\                    one save folder per VMX game: its ID + 0000
+    TitleImage.xbx                   the World icon (not made yet)
+    VMX.SYS                          marks a VMX (World tells a VMX from other memory units by it)
+    SETTINGS.BIN                     the VMX's settings (a loose file, not a save in the dashboard)
+    565810010000\                    one save per VMX game: its ID + 0000
         SaveMeta.xbx                 "Name=BLOX" (what the dashboard shows)
-        SaveImage.xbx                the game's icon
-        GAME.VXP                     the game (the package, below)
-        SCORES.DAT                   its score records (below)
-        DATA\                        anything else the game saves (progress, levels, ghosts)
+        SaveImage.xbx                the game's icon (not made yet)
+        GAME.VXP                     the game (the package, below); absent for a game built into the VMX
+        SAVE.BIN                     the game's own save (progress; up to 16 KB)
+        RECORD.BIN                   its scores as the VMX keeps them (best, won/lost/drawn, what CALL sent)
+    56581F000000\                    "VMX CASINO CHIPS": CHIPS.BIN, the stash every casino game shares (score record 56581F00)
     565880010000\                    a homebrew game, same shape
+
+TDATA\56580001\$c\<offer ID>\       an applet: World's downloadable content, hard disk only
+    ContentMeta.xbx                  "Name=FOLD BUILDER" (the dashboard lists it with World's content)
+    default.xbe                      the applet; offer ID = World's title ID + the game's ID (5658000156581010)
 ```
 
-- **Saves of a game** are in its own folder (`DATA\`, `SCORES.DAT`).
+- **A game and its save are one save in the dashboard**: copying BLOX to another memory unit takes your progress with
+  it; deleting it deletes both. A casino game is two saves' worth: its own folder plus the shared chips.
 - **Reading other games' saves**: any VMX game may READ another game's folder (a sequel checks that you beat the
   first game; a dungeon game gives a bonus if you own a shmup by the same studio). Only the owning game writes.
-- **A game installed on the VMX** = its folder is on the VMX. Its saves travel with it. When the VMX is in the
-  controller, World copies newer saves both ways (newest file wins, by date).
-- **Applets** (Xbox code) are not saves: they live in `TDATA\56580001\APPS\<game ID>\default.xbe` with their
-  own files beside them. The World disc launches them and they return to World when you quit. (2002 story:
-  Microsoft signs them, like Xbox Live title updates.)
+- **One pool of blocks**: games, their saves, the chips and any Xbox game's saves put on the VMX share its space.
+- **SCORES.DAT** (below) is the format for sending scores; the VMX keeps its own RECORD.BIN and builds those records
+  from it when it calls in.
+- **Applets** (Xbox code) are content, not saves: World's hard disk only, never on a VMX. The World disc launches
+  them and they return to World when you quit. (2002 story: Microsoft signs them, like Xbox Live content.) Until
+  FOLD BUILDER is offered that way World also starts it from its own install, E:\Games\FOLD.
 - **VMX capacity** (proposed): the VMX has 8 MB of flash; about 4 MB is its memory-unit area = 256 blocks of
   16 KB, shown in blocks as the Xbox dashboard does.
 - **Retail games** write VMX games into the shared VMX World folder through a "VMX library" in the Xbox XDK

@@ -25,6 +25,5 @@ int  hdd_remove(uint32_t id);                        // deletes its save folder;
 uint8_t *hdd_read(const char *path, int *len);       // a whole file (malloc), or NULL
 int  hdd_exists(const char *path);
 int  hdd_title_saves(uint32_t titleId);              // how many save folders a title has on the disk (0 = none)
-const char *hdd_vmx_dir(void);                       // the VMX's storage folder
 int  hdd_day(void);                                  // days since 15 Nov 2001
 #endif

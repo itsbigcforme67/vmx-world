@@ -29,7 +29,8 @@ side"): the VMX firmware's hardware-free core (vmx-firmware/core) with the .NET 
 ```
 E:\UDATA\56580001\TitleMeta.xbx        "TitleName=VMX World" (UTF-16): the dashboard's Memory screen shows the title
 E:\UDATA\56580001\<ID>0000\GAME.VXP     one installed VMX game, with SaveMeta.xbx "Name=<title>"
-E:\UDATA\56580001\VMX\*.BIN             World's VMX: settings, recs, casino (the firmware's plat_save keys)
+E:\UDATA\56580001\SETTINGS.BIN, <ID>0000\SAVE.BIN + RECORD.BIN, 56581F000000\CHIPS.BIN   World's own VMX's saves
+E:\TDATA\56580001\$c\5658000156581010\    FOLD BUILDER as World content (else E:\Games\FOLD)
 E:\Games\VMXWORLD\                      World itself (the network loader, world.xbe, assets\, catalog\)
 ```
 

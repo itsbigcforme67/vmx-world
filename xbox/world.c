@@ -266,17 +266,12 @@ static void draw_play(void) {
 }
 
 // ---- SCORES
-typedef struct { char id[12]; VmxRec r; } SavedRec;     // as vmx-firmware/core/ui.c keeps them ("recs")
-static SavedRec recs[36]; static VmxBank bank; static int haveBank;
-static void load_scores(void) {
-  memset(recs, 0, sizeof recs); plat_load("recs", recs, sizeof recs);
+static VmxRec recs[MAXVXP]; static int haveRec[MAXVXP]; static VmxBank bank; static int haveBank;
+static void load_scores(void) {                        // each game's record from its save folder ("r<ID>"), the shared chips
+  for (int i = 0; i < NINSTALLED; i++) { char k[12]; snprintf(k, sizeof k, "r%08x", (unsigned)INSTALLED[i].id); haveRec[i] = plat_load(k, &recs[i], sizeof recs[i]) == (int)sizeof recs[i]; }
   haveBank = plat_load("casino", &bank, sizeof bank) == (int)sizeof bank && bank.magic == 0x42435856u;
 }
-static const VmxRec *rec_of(uint32_t id) {
-  char key[12]; snprintf(key, sizeof key, "x%08x", (unsigned)id);
-  for (int i = 0; i < 36; i++) if (!strcmp(recs[i].id, key)) return &recs[i].r;
-  return NULL;
-}
+static const VmxRec *rec_of(uint32_t id) { int i = hdd_installed(id); return i >= 0 && haveRec[i] ? &recs[i] : NULL; }
 static int nscores(void) { return NINSTALLED + 1; }
 static void scores_row(int i, int x, int y, int w, int sel) {
   if (i == NINSTALLED) { gfx_text5(x, y + 4, 1, GOLD, "VMX CASINO CHIPS"); char b[32]; snprintf(b, sizeof b, "%d", haveBank ? (int)bank.chips : 100); gfx_text5(x, y + 15, 1, MUTED, b); return; }
@@ -310,10 +305,20 @@ static void draw_scores(void) {
 
 // ---- APPLETS
 #ifdef NXDK
-#define FOLD_XBE "E:\\Games\\FOLD\\default.xbe"
+#define TDATA "E:\\TDATA\\56580001\\$c\\"
+#define SEP_ "\\"
+#define GAMES_FOLD "E:\\Games\\FOLD\\default.xbe"
 #else
-#define FOLD_XBE "build/hdd/Games/FOLD/default.xbe"
+#define TDATA "build/hdd/TDATA/56580001/$c/"
+#define SEP_ "/"
+#define GAMES_FOLD "build/hdd/Games/FOLD/default.xbe"
 #endif
+// applets are World's downloadable content on the hard disk (docs/DESIGN.md): TDATA\56580001\$c\<offer>\, the offer ID
+// being World's title ID + the VMX game's ID, with ContentMeta.xbx naming it for the dashboard. FOLD BUILDER also
+// runs from its own install (E:\Games\FOLD, FOLD's network loader) until it's offered as content.
+#define FOLD_CONTENT TDATA "5658000156581010" SEP_ "default.xbe"
+static const char *fold_xbe(void) { return hdd_exists(FOLD_CONTENT) ? FOLD_CONTENT : hdd_exists(GAMES_FOLD) ? GAMES_FOLD : NULL; }
+#define FOLD_XBE fold_xbe()
 static const struct { const char *name, *tid; uint32_t id; int per; const char *sym, *unit; int ready; } CASH[] = {
   { "GRAND THEFT AUTO III", "5454000E", 0x5454000E, 100, "$", "", 0 },
   { "GTA: VICE CITY", "5454000F", 0x5454000F, 250, "$", "", 0 },
@@ -323,7 +328,7 @@ static const struct { const char *name, *tid; uint32_t id; int per; const char *
 #define NCASH 5
 static void applet_row(int i, int x, int y, int w, int sel) {
   gfx_text5(x, y + 4, 1, INK, i == 0 ? "FOLD BUILDER" : "VMX CASINO CASHIER");
-  gfx_text5(x, y + 15, 1, MUTED, i == 0 ? (hdd_exists(FOLD_XBE) ? "ON THE HARD DISK" : "NOT INSTALLED") : "FOR CASINO CHIPS");
+  gfx_text5(x, y + 15, 1, MUTED, i == 0 ? (FOLD_XBE ? "ON THE HARD DISK" : "NOT INSTALLED") : "FOR CASINO CHIPS");
 }
 static void draw_cashier(void) {
   gfx_dim(0, 0, 640, 480, 0.97f);
@@ -350,7 +355,7 @@ static void draw_applets(void) {
   if (W.sel[T_APPLETS] == 0) {
     hpanel(276, 100, 332, 330, "FOLD BUILDER", LIT);
     wrap(292, 146, 300, 1, INK, "BUILD FOLD ROOMS LEVELS IN 3D: FOLD THE WORKING PLANE ROUND THE SHAPE, PLACE WALLS, BOXES AND TARGETS, WIRE UP SWITCHES. COMES WITH FOLD ROOMS.", 10);
-    gfx_text5(292, 392, 1, hdd_exists(FOLD_XBE) ? 0xffffff : MUTED, hdd_exists(FOLD_XBE) ? "A: START FOLD BUILDER" : "NOT ON THIS XBOX (E:\\GAMES\\FOLD)");
+    gfx_text5(292, 392, 1, FOLD_XBE ? 0xffffff : MUTED, FOLD_XBE ? "A: START FOLD BUILDER" : "NOT ON THIS XBOX");
   } else {
     hpanel(276, 100, 332, 330, "VMX CASINO CASHIER", GOLD);
     wrap(292, 146, 300, 1, INK, "CASH YOUR VMX CASINO CHIPS IN FOR MONEY IN YOUR XBOX GAMES. EACH GAME HAS ITS OWN RATE. CHIPS CASHED OUT LEAVE YOUR STASH FOR GOOD.", 10);
@@ -446,7 +451,7 @@ void app_frame(const Pad *pad) {
     case T_PLAY: if (W.gamesDirty) vmx_reload(); W.playing = 1; break;
     case T_APPLETS:
       if (*s == 1) { W.applet = 2; W.appSel = 0; load_scores(); }
-      else if (hdd_exists(FOLD_XBE)) {
+      else if (FOLD_XBE) {
 #ifdef NXDK
         XLaunchXBE(FOLD_XBE);
 #else

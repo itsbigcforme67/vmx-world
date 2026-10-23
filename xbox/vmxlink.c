@@ -34,7 +34,7 @@ int vmxlink_poll(void) {
     dev = pending; pending = NULL;
     char b[96]; snprintf(b, sizeof b, "VMX: memory unit, %u sectors of %u\n", (unsigned)dev->uTotalSectorN, (unsigned)dev->nSectorSize); fold_serial(b);
     vol = (Fatx){ .read = rd, .write = wr, .sectors = dev->uTotalSectorN };
-    if (dev->nSectorSize == 512 && fatx_mount(&vol) && fatx_size(&vol, "56580001\\VMX") == -2) { haveVol = 1; fold_serial("VMX: found\n"); }
+    if (dev->nSectorSize == 512 && fatx_mount(&vol) && fatx_size(&vol, "56580001\\VMX.SYS") >= 0) { haveVol = 1; fold_serial("VMX: found\n"); }
     else { other = 1; fold_serial("VMX: not a VMX\n"); }
     return 1;
   }
@@ -50,7 +50,7 @@ int vmxlink_poll(void) {
   changed = 1;
   if (!(img = fopen("build/vmx.mu", "r+b"))) return 0;
   fseek(img, 0, SEEK_END); vol = (Fatx){ .read = rd, .write = wr, .sectors = (uint32_t)(ftell(img) / 512) };
-  haveVol = fatx_mount(&vol) && fatx_size(&vol, "56580001\\VMX") == -2; other = !haveVol;
+  haveVol = fatx_mount(&vol) && fatx_size(&vol, "56580001\\VMX.SYS") >= 0; other = !haveVol;
   return 1;
 }
 #endif
