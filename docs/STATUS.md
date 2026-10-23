@@ -50,3 +50,17 @@ Not done / next (DESIGN.md "Building it"):
 4. The VMX as a memory unit (XMU GADGET).
 Open for the owner: the program format (WebAssembly or not), the CALL name for the "???" pill, the title ID letters,
 where the score service runs, whether to publish the mockup.
+
+## 2026-10-22: VMX CASINO (shared chips, cashier, chip leaderboard)
+
+Owner's brief and calls are in `docs/CASINO.md` (read it first). Built:
+- Chip bank in the firmware (`Microsoft.Vmx.Chips`, casino flag in GAME.VXP), the web simulator and this mockup.
+  BLACKJACK AND HOOKERS (bait = chips) and 9-BALL (stakes per rack) both play from it; C# parity holds.
+- Daily stipend: under 25 chips, a casino game started on a new day tops the stash up to 25.
+- Chip stash = score record 56581F00 (chips, peak, cashed out): CALL on the VMX, SCORES here.
+- Mockup: APPLETS > VMX CASINO CASHIER (casino-cage look): Xbox games with rates, amount, confirm, the steps
+  (read save, add money, fix checksum, sign, take chips), 500 chips per game per day. GTA III is the one marked
+  ready; the saves are pretend. 9-BALL added to GET GAMES; Blackjack moved to a "casino" shelf.
+- Research: `docs/research/CASHIER_SAVES.md` (save signing, per-game formats, trainer route). GTA III first.
+Next: a PC save tool for GTA III (edit + checksum + re-sign, tested in xemu with the owner's own disc), then KOTOR /
+Vice City; Shenmue II needs a save diff. Real online boards need the score service (owner decides where).

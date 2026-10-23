@@ -69,7 +69,8 @@ const CAT = [
     blurb: "Push the boxes onto the targets. Every room is one face of a shape you can't see, until you clear it. Comes with FOLD BUILDER for the Xbox: make rooms in 3D and send them to your VMX." },
   { id: "intercept", tid: 0x56581003, pub: "VMX Studio", blocks: 1, shelf: "arcade", blurb: "Missiles rain on your cities. Steer the sight and burst them in the sky." },
   { id: "invasion", tid: 0x56581004, pub: "VMX Studio", blocks: 1, shelf: "arcade", blurb: "Rows of invaders march down. Hold the line from behind your bunkers." },
-  { id: "blackjack", tid: 0x56581005, pub: "VMX Studio", blocks: 1, shelf: "cards", title: "BLACKJACK AND HOOKERS", blurb: "Blackjack on the pier. Bet your hooks, beat the dealer, don't go bust." },
+  { id: "blackjack", tid: 0x56581005, pub: "VMX Studio", blocks: 1, shelf: "casino", title: "BLACKJACK AND HOOKERS", applet: "CASINO CASHIER", blurb: "Blackjack on the pier. Bet your bait, beat the dealer, don't go bust. A VMX CASINO game: bait is chips, shared with every casino table." },
+  { id: "pool", tid: 0x56581009, pub: "VMX Studio", blocks: 3, shelf: "casino", title: "9-BALL", applet: "CASINO CASHIER", blurb: "Pool against the VMX: hit the lowest ball first, sink the 9 to win. Stake casino chips on each rack, and get down low behind the cue to line up the shot." },
   { id: "checkers", tid: 0x56581006, pub: "VMX Studio", blocks: 1, shelf: "cards", f: ["WON", "LOST", "DRAWN"], blurb: "American checkers against a VMX that thinks ahead." },
   { id: "reversi", tid: 0x56581007, pub: "VMX Studio", blocks: 1, shelf: "cards", f: ["WON", "LOST", "DRAWN"], blurb: "Flip the board your colour. Easy to learn, hard to master." },
   { id: "tricky", tid: 0x56588001, pub: "Homebrew", blocks: 2, shelf: "homebrew", blurb: "Light every wick before the candles run out. A homebrew puzzle game." },
@@ -78,12 +79,17 @@ const CAT = [
 for (const c of CAT) { const a = ADAPT[c.id]; c.a = a; c.title ||= a.title; const s = new Surf(24, 24); a.art(s);
   c.card = s; c.icon = surfURL(s, 3); c.iconBig = surfURL(s, 6); }
 const byId = id => CAT.find(c => c.id === id);
+// VMX CASINO's chip stash as a score board of its own (docs/CASINO.md): score = chips now, then peak and cashed out
+const CASINO = { id: "casino", tid: 0x56581F00, title: "CASINO CHIPS", f: ["PEAK", "CASHED OUT"] };
+{ const s = new Surf(24, 24); for (let k = 0; k < 3; k++) { s.ring(12, 18 - k * 5, 6); s.fill(7, 18 - k * 5, 11, 1, 0); } s.ring(12, 8, 6); s.px(12, 8);
+  CASINO.card = s; CASINO.icon = surfURL(s, 3); }
 const hex = n => n.toString(16).toUpperCase().padStart(8, "0");
 
 // ---------------------------------------------------------------- saved state (this browser only)
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === "object" ? v : d; } catch { return d; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-const ST = Object.assign({ hdd: ["blox", "blobs"], vmx: ["blox"], vmxIn: true, recs: { blox: { best: 1240, day: 370 } }, sent: {}, owner: "PLAYER1", serial: 0 },
+const ST = Object.assign({ hdd: ["blox", "blobs"], vmx: ["blox"], vmxIn: true, recs: { blox: { best: 1240, day: 370 } }, sent: {}, owner: "PLAYER1", serial: 0,
+  bank: { chips: 100, peak: 100, staked: 0, paid: 0, cashed: 0, day: -1 }, cashLog: [], cashDay: {} },
   load("vmx-world", {}));
 if (!ST.serial) ST.serial = (Math.random() * 0xFFFFFF) >>> 0;
 const save = () => store("vmx-world", ST);
@@ -91,6 +97,8 @@ const VMX_BLOCKS = 256;
 const vmxUsed = () => ST.vmx.reduce((n, id) => n + byId(id).blocks, 0) + 3;          // 3 = the VMX's own settings
 // one score record per game, from the simulator's best (fields per the game's labels)
 function recordOf(c) {
+  if (c === CASINO) { const k = ST.bank; if (!k.staked && !k.paid && !k.cashed) return null;
+    return { tid: c.tid, board: 0, flags: 4, date: M.day(), score: k.chips, f: [Math.min(65535, k.peak), Math.min(65535, k.cashed), 0] }; }
   const r = ST.recs[c.id]; if (!r || c.scoreless) return null;
   const won = c.f?.[0] === "WON";
   const score = won ? (r.w || 0) : (r.best || 0);
@@ -130,6 +138,7 @@ const NEWS = [
 
 const APPLETS = [
   { id: "foldb", name: "FOLD BUILDER", from: "fold", what: "Build FOLD ROOMS levels in 3D: fold the working plane round the shape, place walls, boxes and targets, wire up buttons and gates. Test on the VMX window, then send the level to your VMX.", img: "img/fold-builder.png" },
+  { id: "cashier", name: "VMX CASINO CASHIER", from: ["pool", "blackjack"], what: "Cash your VMX CASINO chips in for money in your Xbox games. The cashier finds their saves on the hard disk, adds the money, and re-signs the save so the game takes it. Each game has its own rate and a daily limit. Chips cashed out leave your stash for good.", view: cashierView, key: cashierKey },
   { id: "kit", name: "RETAIL APPLET (EXAMPLE)", from: null, what: "Each retail game with VMX features gets an applet here: its VMX games, the unlocks traded with the disc game, and its score tables, without the disc in the tray. None yet in this mockup." },
 ];
 
@@ -154,6 +163,7 @@ function draw() {
 }
 const hint = (k, t) => `<span class="h"><b class="k k${k}">${k}</b>${t}</span>`;
 function hints() {
+  if (S.applet?.view) return hint("A", "CASH OUT") + `<span class="h"><b class="k kLR">&#9650; &#9660;</b>GAME</span><span class="h"><b class="k kLR">&#9664; &#9654;</b>CHIPS (LT RT: 100)</span>` + hint("B", "BACK TO WORLD");
   if (S.applet) return hint("B", "BACK TO WORLD");
   if (S.play) return hint("A", "") + hint("B", "") + `<span class="h">D-PAD / STICK</span><span class="h"><b class="k kBK">BACK</b>VMX SIDE BUTTON: QUIT</span>`;
   if (S.menu) return hint("A", "SELECT") + hint("B", "CANCEL");
@@ -202,10 +212,10 @@ function play() {
 }
 function placeDevice() { const st = el("#stage"); if (st && device.parentNode !== st) st.appendChild(device); if (!S.play) idleScreen(); }
 function scores() {
-  const games = CAT.filter(c => ST.hdd.includes(c.id) && !c.scoreless);
+  const games = scoreGames();
   if (!games.length) return `<div class="panel left"><p class="empty">NO GAMES YET</p></div>`;
   const k = sel("scores", games.length), c = games[k], r = recordOf(c), sent = ST.sent[c.id];
-  const unsent = CAT.map(x => recordOf(x) && !ST.sent[x.id] ? x : null).filter(Boolean);
+  const unsent = [...CAT, CASINO].map(x => recordOf(x) && !ST.sent[x.id] ? x : null).filter(Boolean);
   const table = national(c, r && sent ? r.score : null);
   return `<div class="panel left">${list("scores", games, it => `<img src="${it.icon}" alt=""><span>${esc(it.title)}</span><small class="st">${recordOf(it) ? (ST.sent[it.id] ? "SENT" : "NEW") : ""}</small>`)}</div>
     <div class="panel right sc">
@@ -222,19 +232,20 @@ function scores() {
 function national(c, yours) {
   let r = c.tid; const rnd = () => { r ^= r << 13; r >>>= 0; r ^= r >> 17; r ^= r << 5; r >>>= 0; return r / 4294967296; };
   const names = ["ZEKE", "MOMO", "JAX", "PIXL", "DANA", "R2K", "LULU", "OSKR", "VEX", "TAMI"];
-  const top = c.f?.[0] === "WON" ? 60 : c.id === "fold" ? 28 : 40000;
+  const top = c.f?.[0] === "WON" ? 60 : c.id === "fold" ? 28 : c === CASINO ? 6000 : 40000;
   const t = Array.from({ length: 5 }, (_, i) => ({ name: names.splice((rnd() * names.length) | 0, 1)[0], score: Math.round(top * (1 - i * 0.12) * (0.9 + rnd() * 0.1)) }));
   if (yours != null) t.push({ name: ST.owner, score: yours, you: true });
   return t.sort((a, b) => b.score - a.score).slice(0, 5);
 }
 function applets() {
-  const k = sel("applets", APPLETS.length), a = APPLETS[k], have = !a.from || ST.hdd.includes(a.from);
-  return `<div class="panel left">${list("applets", APPLETS, it => `<span>${esc(it.name)}</span><small class="st">${it.from && !ST.hdd.includes(it.from) ? "NEEDS " + byId(it.from).title : ""}</small>`)}</div>
+  const k = sel("applets", APPLETS.length), a = APPLETS[k], have = hasFrom(a);
+  return `<div class="panel left">${list("applets", APPLETS, it => `<span>${esc(it.name)}</span><small class="st">${hasFrom(it) ? "" : "NEEDS " + needName(it)}</small>`)}</div>
     <div class="panel right detail"><h2>${esc(a.name)}</h2>${a.img ? `<div class="shot" style="background-image:url(${a.img})"></div>` : ""}<p>${esc(a.what)}</p>
-    ${a.from ? `<div class="act ${S.zone === "content" ? "focus" : ""}">${have ? "A &nbsp;START APPLET" : "GET " + byId(a.from).title + " FIRST"}</div>` : ""}</div>`;
+    ${a.from ? `<div class="act ${S.zone === "content" ? "focus" : ""}">${have ? "A &nbsp;START APPLET" : "GET " + needName(a) + " FIRST"}</div>` : ""}</div>`;
 }
 function overlay() {
   if (S.menu) return `<div class="menu"><h3>${esc(S.menu.title)}</h3>${S.menu.items.map((m, i) => `<div class="row ${i === S.menu.k ? "sel" : ""}" data-menu="${i}">${m[0]}</div>`).join("")}</div>`;
+  if (S.applet?.view) return `<div class="applet cashier">${S.applet.view()}</div>`;
   if (S.applet) return `<div class="applet"><div class="shot big" style="background-image:url(${S.applet.img})"></div>
     <p>On the Xbox, World starts <b>${S.applet.name}</b> here (TDATA\\56580001\\APPS\\${hex(byId(S.applet.from).tid)}\\default.xbe), and returns to World when you quit. This is its level view, from the FOLD repo.</p></div>`;
   return "";
@@ -262,8 +273,8 @@ const held = {}, latch = {};
 async function startGame(c) {
   const a = c.a;
   try { a.m ||= await a.load.call(a); } catch { sErr(); toast("COULDN'T LOAD " + c.title); return; }
-  const g = a.start(a.m, Date.now() % 100000, false);
-  S.play = { c, a, g, prev: {} };
+  const bank = bankFor(a), g = a.start(a.m, Date.now() % 100000, false, bank);
+  S.play = { c, a, g, bank, prev: {} };
   for (const b of BTN) held[b] = latch[b] = false;
   sOk(); draw();
 }
@@ -274,8 +285,83 @@ function tickGame() {
   P.prev = h;
   if (e.b && !P.a.usesB) return stopGame();
   P.a.tick(P.g, { held: h, edges: e, tap: null, demo: false });
+  bankSync(P);
   const rec = (ST.recs[P.c.id] ||= {});
   if (P.a.record(P.g, rec)) { rec.day = M.day(); delete ST.sent[P.c.id]; save(); }
+}
+
+// ---------------------------------------------------------------- VMX CASINO (docs/CASINO.md)
+const hasFrom = a => !a.from || [].concat(a.from).some(id => ST.hdd.includes(id));
+const needName = a => byId([].concat(a.from)[0]).title;
+const scoreGames = () => [...CAT.filter(c => ST.hdd.includes(c.id) && !c.scoreless), ...(recordOf(CASINO) ? [CASINO] : [])];
+// the chip bank lives on the VMX (the firmware keeps it, core/game_vx.c); this mockup keeps one in ST.bank
+const STIPEND = 25;
+function bankFor(a) {
+  if (!a.casino) return undefined;
+  const day = M.day(); let bonus = 0;
+  if (ST.bank.day !== day && ST.bank.chips < STIPEND) { bonus = STIPEND - ST.bank.chips; ST.bank.chips = STIPEND; ST.bank.day = day; save(); }
+  return { chips: ST.bank.chips, bonus };
+}
+function bankSync(P) {
+  if (!P.bank || P.bank.chips === ST.bank.chips) return;
+  const d = P.bank.chips - ST.bank.chips; if (d > 0) ST.bank.paid += d; else ST.bank.staked -= d;
+  ST.bank.chips = P.bank.chips; ST.bank.peak = Math.max(ST.bank.peak, ST.bank.chips); delete ST.sent.casino; save();
+}
+// the CASHIER: Xbox games whose saves it can top up (docs/research/CASHIER_SAVES.md). per = game money for 1 chip;
+// ready = we know the save format; the rest are shown as coming. In this mockup the saves are pretend.
+const CASH_GAMES = [
+  { name: "GRAND THEFT AUTO III", tid: "5454000E", sym: "$", per: 100, ready: true, save: "SAVE 1: PORTLAND",
+    how: "Money is in the save's player block (money + the counter on screen). The cashier fixes GTA's checksum, then re-signs the save." },
+  { name: "GRAND THEFT AUTO: VICE CITY", tid: "5454000F", sym: "$", per: 250, how: "Same family as GTA III. Coming once its Xbox save wrapper is checked." },
+  { name: "GTA: SAN ANDREAS", tid: "54540082", sym: "$", per: 250, how: "Money offsets are documented for PC; the Xbox wrapper still needs checking." },
+  { name: "STAR WARS: KOTOR", tid: "4C410003", sym: "", unit: " CREDITS", per: 10, how: "Its Xbox saves are known to be editable (KSE). Coming soon." },
+  { name: "SHENMUE II", tid: "4D530032", sym: "HK$", per: 2, how: "No public save format yet. Needs our own research first; crate work pays HK$10 a crate, so 1 chip = HK$2." },
+];
+const DAY_CAP = 500;                                       // chips per game per day
+const money = (g, n) => g.sym + (n * g.per).toLocaleString("en-US") + (g.unit || "");
+function cashLeft(g) { const c = ST.cashDay[g.tid]; return DAY_CAP - (c && c.day === M.day() ? c.n : 0); }
+function cashierView() {
+  const C = S.cash, g = CASH_GAMES[C.g], left = cashLeft(g), k = ST.bank;
+  const rows = CASH_GAMES.map((x, i) => `<div class="cg ${i === C.g ? "sel" : ""} ${x.ready ? "" : "dim"}"><span>${esc(x.name)}</span><small>${x.ready ? "1 CHIP = " + money(x, 1) : "COMING"}</small></div>`).join("");
+  const step = C.busy ? `<div class="steps">${C.busy.steps.map((t, i) => `<div class="${i < C.busy.at ? "done" : i === C.busy.at ? "now" : ""}">${t}</div>`).join("")}</div>` : "";
+  return `<div class="cage"><div class="sign">VMX CASINO &middot; CASHIER</div>
+    <div class="stash"><small>YOUR STASH ${ST.vmxIn ? "(VMX IN CONTROLLER 1)" : "(NO VMX)"}</small><b>${ST.vmxIn ? k.chips.toLocaleString("en-US") : "--"}</b><small>CHIPS</small></div>
+    <div class="cols"><div class="games"><small class="lbl">XBOX GAMES ON THE HARD DISK</small>${rows}</div>
+    <div class="slip"><h3>${esc(g.name)}</h3><p class="how">${esc(g.how)}</p>
+    ${g.ready ? `<div class="amt"><span>&#9664;</span><b>${C.amt}</b><span>&#9654;</span></div><div class="for">CHIPS FOR <b>${money(g, C.amt)}</b></div>
+      <small>${esc(g.save)} &middot; ${left} CHIPS LEFT TODAY</small>` : `<div class="for soon">NOT AT THE CAGE YET</div>`}
+    ${step}</div></div>
+    <small class="note">On the Xbox, the cashier edits the game's save in UDATA\\${g.tid}, then signs it again with that game's key, read from its own disc. Chips cashed out leave your stash for good.</small></div>`;
+}
+function cashierKey(b) {
+  const C = S.cash; if (!C) return false;
+  if (C.busy) return true;                                // wait for the save to be written
+  const g = CASH_GAMES[C.g];
+  if (b === "up" || b === "down") { C.g = (C.g + (b === "up" ? -1 : 1) + CASH_GAMES.length) % CASH_GAMES.length; sMove(); return true; }
+  if (["left", "right", "lt", "rt"].includes(b)) {
+    const d = (b === "left" || b === "lt" ? -1 : 1) * (b === "lt" || b === "rt" ? 100 : 10);
+    C.amt = Math.max(10, Math.min(DAY_CAP, C.amt + d)); sMove(); return true;
+  }
+  if (b !== "a") return false;
+  if (!g.ready) { sErr(); toast(g.name + " ISN'T AT THE CAGE YET"); return true; }
+  if (!ST.vmxIn) { sErr(); toast("PUT YOUR VMX IN CONTROLLER 1"); return true; }
+  if (C.amt > ST.bank.chips) { sErr(); toast("YOU HAVE " + ST.bank.chips + " CHIPS"); return true; }
+  if (C.amt > cashLeft(g)) { sErr(); toast("DAILY LIMIT: " + cashLeft(g) + " CHIPS LEFT FOR " + g.name); return true; }
+  openMenu("CASH " + C.amt + " CHIPS FOR " + money(g, C.amt) + "?", [["YES, ADD IT TO " + g.save, () => cashOut(g, C.amt)], ["NO", () => sBack()]]);
+  return true;
+}
+function cashOut(g, n) {
+  const C = S.cash;
+  C.busy = { at: 0, steps: ["READING " + g.save, "ADDING " + money(g, n), "FIXING THE GAME'S CHECKSUM", "SIGNING THE SAVE", "TAKING " + n + " CHIPS FROM YOUR VMX"] };
+  const tick = () => {
+    if (!S.cash || S.cash !== C) return;
+    if (++C.busy.at < C.busy.steps.length) { sMove(); draw(); return setTimeout(tick, 450); }
+    ST.bank.chips -= n; ST.bank.cashed += n; delete ST.sent.casino;
+    const c = ST.cashDay[g.tid]; ST.cashDay[g.tid] = { day: M.day(), n: (c && c.day === M.day() ? c.n : 0) + n };
+    ST.cashLog.unshift({ day: M.day(), tid: g.tid, chips: n, got: money(g, n) }); ST.cashLog.length = Math.min(ST.cashLog.length, 20);
+    C.busy = null; save(); sOk(); toast(money(g, n) + " ADDED TO " + g.name);
+  };
+  draw(); setTimeout(tick, 450);
 }
 
 // ---------------------------------------------------------------- actions
@@ -309,7 +395,7 @@ function mineAction() {
 // SCORES: send every unsent record online (made-up network; the bytes are the real records)
 function sendOnline() {
   if (S.up) return;
-  const games = CAT.filter(c => recordOf(c) && !ST.sent[c.id]);
+  const games = [...CAT, CASINO].filter(c => recordOf(c) && !ST.sent[c.id]);
   if (!games.length) { sErr(); return toast("NO NEW SCORES: PLAY SOMETHING FIRST"); }
   const msg = M.packMessage({ serial: ST.serial, name: ST.owner, records: games.map(recordOf) });
   S.up = { n: games.length, bytes: msg.length, games: games.map(g => g.id), p: 0, t0: performance.now() }; sOk();
@@ -332,7 +418,6 @@ function press(b) {                                       // b: up down left rig
     if (BTN.includes(b)) { held[b] = true; latch[b] = true; }
     return;
   }
-  if (S.applet) { if (b === "b" || b === "back") { S.applet = null; sBack(); draw(); } return; }
   if (S.menu) {
     const m = S.menu;
     if (b === "up" || b === "down") { m.k = (m.k + (b === "up" ? -1 : 1) + m.items.length) % m.items.length; sMove(); }
@@ -340,6 +425,8 @@ function press(b) {                                       // b: up down left rig
     else if (b === "b") { S.menu = null; sBack(); }
     return draw();
   }
+  if (S.applet?.key && S.applet.key(b)) return draw();
+  if (S.applet) { if (b === "b" || b === "back") { S.applet = null; sBack(); draw(); } return; }
   if (b === "lt" || b === "rt" || (S.zone === "tabs" && (b === "left" || b === "right"))) {
     const d = b === "lt" || b === "left" ? -1 : 1; S.tab = (S.tab + d + TABS.length) % TABS.length; sMove(); return draw();
   }
@@ -350,7 +437,7 @@ function press(b) {                                       // b: up down left rig
   if (b === "b" || b === "back") { S.zone = "tabs"; sBack(); return draw(); }
   const key = ["news", "shop", S.col ? "vmx" : "hdd", "play", "scores", "applets"][S.tab];
   const n = [NEWS.length, CAT.length, (S.col ? ST.vmx : ST.hdd).length, ST.hdd.length,
-    CAT.filter(c => ST.hdd.includes(c.id) && !c.scoreless).length, APPLETS.length][S.tab];
+    scoreGames().length, APPLETS.length][S.tab];
   if (b === "up" || b === "down") {
     const k = sel(key, n), nk = Math.max(0, Math.min(n - 1, k + (b === "up" ? -1 : 1)));
     if (b === "up" && k === 0) { S.zone = "tabs"; sBack(); return draw(); }
@@ -363,7 +450,7 @@ function press(b) {                                       // b: up down left rig
   else if (S.tab === 3) { const c = byId(ST.hdd[sel("play", ST.hdd.length)]); if (c) startGame(c); }
   else if (S.tab === 4) sendOnline();
   else if (S.tab === 5) { const a = APPLETS[sel("applets", APPLETS.length)];
-    if (!a.from) sErr(); else if (!ST.hdd.includes(a.from)) { sErr(); toast("GET " + byId(a.from).title + " FIRST"); } else { S.applet = a; sOk(); } }
+    if (!a.from) sErr(); else if (!hasFrom(a)) { sErr(); toast("GET " + needName(a) + " FIRST"); } else { S.applet = a; S.cash = { g: 0, amt: 50, busy: null }; sOk(); } }
   draw();
 }
 function release(b) { if (BTN.includes(b)) held[b] = false; }
