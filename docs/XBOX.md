@@ -66,10 +66,13 @@ Each start of VMX World asks the laptop for the build's version and downloads it
 
 ## The hologram's cost
 
-Each view's model picture (glow, edges, glass, bloom) is rendered once and kept: the turning VMX in 40 steps, made
-one per tick from World's start (about 5 s in xemu while NEWS shows), the big one once with a table of which VMX
-pixel each TV pixel shows. A frame then adds the kept picture, the beam and the live screen through a tint table.
-In xemu World runs at 15-17 fps with it (20-25 without); the console's own numbers are still to come.
+Every picture of the model (the turning VMX's 40 steps, the big one; glow, edges, glass and bloom baked in) is made
+ahead of time on the PC (owner: "why not just do that ahead of time"): `cd xbox && make -f Makefile.pc holo` renders
+them with the same code (holo.c, holo_bake.c) into assets/vmx_holo.pak (1.4 MB, zero runs packed), which goes on the
+disc. World only loads them; a frame adds the picture, the beam and the live screen through a tint table, and the big
+view works out once which VMX pixel each TV pixel shows. Re-bake after changing the model (tools/hologram_export.py
+-> assets/vmx_holo.bin), the look or the views' layout (a .pak made for another layout is refused and World renders
+from the .bin instead). In xemu: 15-17 fps in PLAY, no slow start; the console's own numbers are still to come.
 
 ## Next
 

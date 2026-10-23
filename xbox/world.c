@@ -340,9 +340,9 @@ void app_init(const char *levelsDir) {
   (void)levelsDir;
   memset(&W, 0, sizeof W);
 #ifdef NXDK
-  haveHolo = holo_load("D:\\assets\\vmx_holo.bin");
+  haveHolo = holo_load_baked("D:\\assets\\vmx_holo.pak") || holo_load("D:\\assets\\vmx_holo.bin");
 #else
-  haveHolo = holo_load("build/disc/assets/vmx_holo.bin");
+  haveHolo = holo_load_baked("build/disc/assets/vmx_holo.pak") || holo_load("build/disc/assets/vmx_holo.bin");
 #endif
   LOG("init"); hdd_init(); LOG("hdd ok"); vmx_reload(); LOG("vmx ok"); load_scores(); LOG("ready");
   // the brushed metal FOLD's panels use (not needed for World's own look, but the font and panels come from gfx.c)

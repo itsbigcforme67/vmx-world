@@ -28,6 +28,8 @@ static View V[2] = {
   { 60, 90, 520, 350, 320, 262, 9.4f, 43, 1, { 0 }, NULL, 440, 320, 470, 0.8f },
 };
 static uint8_t TINT[512][3];                          // brightness index -> the added colour
+static void tint_table(void);
+static void angles(int view, int k, float *yaw, float *pitch);
 
 int holo_load(const char *path) {
   int n = 0; uint8_t *d = hdd_read(path, &n);
@@ -37,12 +39,15 @@ int holo_load(const char *path) {
   E = malloc((size_t)nE * 12); P = malloc((size_t)nP * sizeof(HPoint));
   memcpy(E, d + 12, (size_t)nE * 12); memcpy(P, d + 12 + nE * 12, (size_t)nP * sizeof(HPoint));
   free(d);
+  tint_table();
+  return loaded = 1;
+}
+static void tint_table(void) {
   for (int i = 0; i < 512; i++) {                    // v = i / 85: green, with a white-hot core past 1.6
     float v = i / 85.0f, hot = v > 1.6f ? (v - 1.6f) * 120 : 0;
     float c[3] = { v * 0.35f * 204 + hot, v * 1.0f * 204 + hot, v * 0.45f * 204 + hot };
     for (int k = 0; k < 3; k++) TINT[i][k] = (uint8_t)(c[k] > 255 ? 255 : c[k]);
   }
-  return loaded = 1;
 }
 
 // ---- rendering a view into an 8-bit picture (once per view / turn step)
@@ -147,6 +152,58 @@ static uint8_t *beam(View *v) {                       // the emitter's glowing d
     int k = (int)((disc + cone) * v->beamK * 85); b[y * w + x] = (uint8_t)(k > 255 ? 255 : k);
   }
   return b;
+}
+
+// ---- the pictures made ahead of time (tools: xbox/Makefile.pc's holo_bake), so the Xbox only loads them
+// "VHPK", u32 views, then per view: u32 frames, w, h, and per frame u32 length + the bytes, zeros packed as 0, count
+static int pack_frame(const uint8_t *src, int n, uint8_t *dst) {
+  int o = 0;
+  for (int i = 0; i < n; ) {
+    if (src[i]) { dst[o++] = src[i++]; continue; }
+    int run = 0; while (i < n && !src[i] && run < 255) { i++; run++; }
+    dst[o++] = 0; dst[o++] = (uint8_t)run;
+  }
+  return o;
+}
+#ifndef NXDK
+#include <stdio.h>
+int holo_bake(const char *out) {
+  if (!loaded) return 0;
+  FILE *f = fopen(out, "wb"); if (!f) return 0;
+  uint32_t nv = 2; fwrite("VHPK", 1, 4, f); fwrite(&nv, 4, 1, f);
+  long total = 0;
+  for (int view = 0; view < 2; view++) {
+    View *v = &V[view]; uint32_t hd[3] = { (uint32_t)v->frames, (uint32_t)v->w, (uint32_t)v->h }; fwrite(hd, 4, 3, f);
+    uint8_t *buf = malloc((size_t)v->w * v->h * 2 + 16);
+    for (int k = 0; k < v->frames; k++) {
+      float y, p; angles(view, k, &y, &p);
+      if (!v->cache[k]) v->cache[k] = render(v, y, p);
+      uint32_t len = (uint32_t)pack_frame(v->cache[k], v->w * v->h, buf); fwrite(&len, 4, 1, f); fwrite(buf, 1, len, f); total += len;
+    }
+    free(buf);
+  }
+  fclose(f); printf("%s: %ld bytes of pictures\n", out, total);
+  return 1;
+}
+#endif
+int holo_load_baked(const char *path) {
+  int n = 0; uint8_t *d = hdd_read(path, &n), *p;
+  if (!d || n < 8 || memcmp(d, "VHPK", 4)) { free(d); return 0; }
+  p = d + 8; uint8_t *end = d + n;
+  for (int view = 0; view < 2 && p + 12 <= end; view++) {
+    View *v = &V[view]; uint32_t fr, w, h; memcpy(&fr, p, 4); memcpy(&w, p + 4, 4); memcpy(&h, p + 8, 4); p += 12;
+    if ((int)fr != v->frames || (int)w != v->w || (int)h != v->h) { free(d); return 0; }   // made for another layout
+    for (uint32_t k = 0; k < fr; k++) {
+      uint32_t len; if (p + 4 > end) break; memcpy(&len, p, 4); p += 4; if (p + len > end) break;
+      uint8_t *o = malloc((size_t)w * h); int at = 0;
+      for (uint32_t i = 0; i < len && at < (int)(w * h); ) {
+        if (p[i]) o[at++] = p[i++]; else { int run = p[i + 1]; memset(o + at, 0, (size_t)run); at += run; i += 2; }
+      }
+      v->cache[k] = o; p += len;
+    }
+  }
+  free(d); tint_table();
+  return loaded = 1;
 }
 
 // ---- every frame

@@ -23,7 +23,7 @@ package: $(OUTPUT_DIR)/default.xbe
 	mkdir -p $(OUTPUT_DIR)/VMXWORLD/assets $(OUTPUT_DIR)/VMXWORLD/catalog
 	cp $(OUTPUT_DIR)/default.xbe $(OUTPUT_DIR)/VMXWORLD/
 	python3 ../tools/xbe_title_id.py $(OUTPUT_DIR)/VMXWORLD/default.xbe 0x56580001
-	cp $(FOLD)/assets/vmx_small.rgba $(FOLD)/assets/vmx_large.rgba assets/vmx_holo.bin $(OUTPUT_DIR)/VMXWORLD/assets/
+	cp $(FOLD)/assets/vmx_small.rgba $(FOLD)/assets/vmx_large.rgba assets/vmx_holo.pak $(OUTPUT_DIR)/VMXWORLD/assets/
 	cp $(FW)/build/games/*.VXP $(OUTPUT_DIR)/VMXWORLD/catalog/
 	if [ -n "$(DEMO)" ]; then cp $(DEMO) $(OUTPUT_DIR)/VMXWORLD/demo.txt; fi
 	$(EXTRACT_XISO) -c $(OUTPUT_DIR)/VMXWORLD $(OUTPUT_DIR)/vmxworld.iso >/dev/null

@@ -6,7 +6,9 @@
 #define HOLO_H
 #include <stdint.h>
 enum { HOLO_LIST, HOLO_PLAY };            // the PLAY tab's small turning VMX / the big one while you play
-int  holo_load(const char *path);         // 1 = loaded (without it holo_draw does nothing)
+int  holo_load_baked(const char *path);   // the pictures made ahead of time (assets/vmx_holo.pak); 1 = loaded
+int  holo_load(const char *path);         // or the model itself (assets/vmx_holo.bin), rendered here; 1 = loaded
+int  holo_bake(const char *out);          // PC only: renders every picture and writes the .pak
 void holo_draw(int view, int t, const uint8_t *screen, int screenOn);   // t: World's 30 Hz tick count
 void holo_prepare(void);                  // call every tick: renders the next cached picture until all are ready
 #endif
