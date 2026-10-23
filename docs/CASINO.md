@@ -50,12 +50,28 @@ Chips are play money. They can't be bought, and nothing real can be won with the
 | VIDEO POKER | 5658100A | bet 1-5; Jacks or Better, full-pay 9/6 (royal 4000 at 5 chips) | 99.54% return with perfect play at max bet (98.4% under 5); the careful builder |
 | ROULETTE | 5658100B | chips in 1s, up to 50 a bet; red/black, odd/even, 1-18/19-36 (1:1), dozens (2:1), one number (35:1) | single zero: 97.3% return on every bet; bets stay on between spins |
 | SLOTS | 5658100C | bet 1-3; 3 reels x 24 stops, 1 line; 3 VMX chips = jackpot (3000 at 3 chips) | 93.4% return (94.85% at 3 chips), a win on 18.45% of spins; the fast, risky table |
+| HI-LO | 5658100D | stake 1-10; call higher/lower; pot x floor(97 x left / wins)/100 per right call; B collects | every call returns 97% of the pot (card-aware odds); 10 calls or 9999 auto-collect |
+| CASINO WAR | 5658100E | bet 1-20 + tie 0-10 (10:1); tie: war (raise, tie at war wins) or surrender (half back) | 2.88% going to war; tie bet 18.65%; 6-deck shoe |
+| BACCARAT | 5658100F | Player 1:1, Banker 1:1 less 5% (whole-chip commission with credit), Tie 8:1; 0-20 each | 1.24% / 1.06% / 14.36%; 8 decks, full tableau |
+| 3 CARD POKER | 56581011 | ante 1-10, pair plus 0-10; play or fold; ante bonus 5/4/1; pair plus 40/30/6/4/1 | ante 3.37% (Q-6-4), pair plus 2.32% |
+| RED DOG | 56581012 | bet 1-20; spread pays 5/4/2/1, trips 11:1, raise once | 2.80% raising on spread 7+; 6 decks |
+| LET IT RIDE | 56581013 | three bets 1-10; pull back two; pays 1000/200/50/11/8/5/3/2/1 | 3.51% of one bet with best play |
+| CRAPS | 56581014 | pass/don't 1-20, free odds to 3x (whole-chip steps), field, any 7, any craps | 1.41% / 1.36% / 0% / 2.78% / 16.7% / 11.1%; shared dice art lives here |
+| SIC BO | 56581015 | small/big/odd/even, totals 60/30/17/12/8/6/6, any triple 30, one triple 150, single die 1/2/3 | 2.78% even bets; totals 9.7-19%; Macau table |
+| CHUCK-A-LUCK | 56581016 | faces 1-6 (1/2/10 for 1/2/3 dice), lo/hi 1:1 | 4.63% faces, 2.78% lo/hi; flipping birdcage |
+| KENO | 56581017 | 1-10 spots, bet 1-10, 20 of 80 drawn | 92-95% for 2-10 spots (1 spot 75%); kinder than a lounge on purpose |
+| BIG SIX | 56581018 | money wheel, 54 segments: 1/2/5/10/20, Joker and X 40:1 | 11.1% ($1) to 24.1% (40:1) |
+| SCRATCH | 56581019 | tickets 1/2/5: MATCH 3 and LUCKY 7, prizes to 500x | 92.32% / 93.84%; outcome fixed at purchase, scratched with the coin |
+| FROG RACE | 5658101A | BOG HOP frogs, 4-6 a race, WIN bets 0-20 at posted odds | 9.5-11.1% per race (shown on the card), whole finishing order drawn first |
 
 Every new table's board is its biggest single payout (Video Poker's field 1 = hands played). The outcome always
 comes from the RNG first; animations only land on it (slot stops and the roulette ball can't change the odds).
 Return figures are exact (slots enumerated over all 13824 stop combinations; checked again by the coordinator).
 
-More table ideas (not built): craps, keno or scratch cards, horse or frog racing, a casino version of BOG HOP.
+All 18 tables are in (2026-10-22: owner "get em all in here"). They were built from `docs/CASINO_TABLE_BRIEF.md` by
+helpers and checked by the coordinator (frames, parity, odds). `tools/add_casino_table.py` wires a finished table into
+the simulator, World, `make test` and the README. Not every table has to be on a VMX at once (owner): World picks
+which go on it; the firmware holds up to 32 managed games.
 
 ## The leaderboard record (built)
 

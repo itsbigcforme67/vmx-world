@@ -68,3 +68,7 @@ Vice City; Shenmue II needs a save diff. Real online boards need the score servi
 ## 2026-10-22 later: three more casino tables
 VIDEO POKER, ROULETTE and SLOTS (CASINO.md "The games") are in GET GAMES (casino shelf, 2 blocks each) and play from
 the shared bank; the cashier opens with any casino game installed.
+
+## 2026-10-22 end: 18 casino tables
+All in GET GAMES (casino shelf) and the cashier's list: see CASINO.md. `tools/add_casino_table.py` wires a new table in.
+`docs/CASINO_TABLE_BRIEF.md` is the brief the helpers built them from.
