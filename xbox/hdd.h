@@ -14,12 +14,13 @@ typedef struct {
 
 #define MAXVXP 48
 extern Vxp CATALOG[MAXVXP]; extern int NCATALOG;     // on the disc (GET GAMES)
-extern Vxp INSTALLED[MAXVXP]; extern int NINSTALLED; // on the hard disk (MY VMX, PLAY)
+extern Vxp INSTALLED[MAXVXP]; extern int NINSTALLED; // on the VMX if one is plugged in, else the hard disk (MY VMX, PLAY)
 
 void hdd_init(void);                                 // mounts E: (Xbox), makes UDATA\56580001 with its TitleMeta
 void hdd_scan(void);                                 // re-reads CATALOG and INSTALLED
 int  hdd_installed(uint32_t id);                     // index in INSTALLED or -1
-int  hdd_install(const Vxp *v);                      // copies a catalogue game to the hard disk; 1 = ok
+int  hdd_on_vmx(void);                                // 1 = a VMX is plugged in: INSTALLED, installs and saves are on it
+int  hdd_install(const Vxp *v);                      // copies a catalogue game to the VMX, or the hard disk; 1 = ok
 int  hdd_remove(uint32_t id);                        // deletes its save folder; 1 = ok
 uint8_t *hdd_read(const char *path, int *len);       // a whole file (malloc), or NULL
 int  hdd_exists(const char *path);

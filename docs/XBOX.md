@@ -9,7 +9,12 @@ Xbox for real"). The look follows `mockup/world.html`; everything in it is real 
 - **GET GAMES**: the disc's catalogue (`catalog/*.VXP`: every game vmx-firmware builds, 27 now). A "downloads" it:
   the VXP is copied to the hard disk as a save of VMX World (below). Title, publisher, blurb and the 24x24 card all
   come out of the VXP itself.
-- **MY VMX**: what's on the hard disk; A: play it or delete it.
+- **MY VMX**: what's on the VMX (or the hard disk, below); A: play it or delete it.
+- **The VMX in a controller** (xbox/vmxlink.c): a memory unit is USB mass storage on the controller's hub, so World
+  registers nxdk's mass-storage driver before SDL starts USB (`app_usb_init`) and reads the VMX's FATX volume with
+  vmx-firmware/core/fatx.c. A memory unit with `56580001\VMX` on it is a VMX: while it's plugged in, MY VMX, PLAY,
+  GET GAMES' downloads and SCORES (records, casino chips) all use the VMX; unplugged, World's own copy on the hard disk.
+  Plugging and unplugging is noticed while World runs ("VMX PLUGGED IN"). Another memory unit: "isn't a VMX".
 - **PLAY**: the real VMX on the TV, as a turning skeleton hologram (xbox/holo.c; DESIGN.md "The look on the Xbox
 side"): the VMX firmware's hardware-free core (vmx-firmware/core) with the .NET runtime
   (vmx-firmware/runtime/vxrt.c) running every game on the hard disk, inside the owner's VMX render. The pad is the
@@ -28,8 +33,9 @@ E:\UDATA\56580001\VMX\*.BIN             World's VMX: settings, recs, casino (the
 E:\Games\VMXWORLD\                      World itself (the network loader, world.xbe, assets\, catalog\)
 ```
 
-World's XBE has title ID 56580001 (`tools/xbe_title_id.py` patches the certificate; cxbe can't). The VMX in the
-controller isn't real yet (XMU GADGET): until it is, World's VMX lives on the hard disk.
+World's XBE has title ID 56580001 (`tools/xbe_title_id.py` patches the certificate; cxbe can't). With no VMX plugged
+in, World's VMX lives on the hard disk. On a VMX the same folders sit at the root of its volume (a memory unit's root
+holds title folders, as UDATA does): `56580001\<ID>0000\GAME.VXP`, `56580001\VMX\*.BIN` (vmx-firmware/core/vmxvol.h).
 
 ## Build and test
 
@@ -44,7 +50,13 @@ microgames/fold (renderer, platform layer, GPU, pad scripts) and vmx-firmware (c
 Never `make clean` in xbox/ (nxdk's clean deletes its shared libraries). The VMX games come from
 vmx-firmware/build/games (build them there first).
 
-xemu runs use `unshare` with an empty /dev/input so they never see the owner's controllers.
+    tools/run_xemu.sh --mu vmx.img ...        # a memory unit image in controller 1 (xemu's keyboard pad)
+    tools/build_xbox.sh DEMO=tests/xemu_vmx.txt   # then: World lists the VMX's games and downloads one onto it
+    tools/kernel_fatx_test.sh                 # the Xbox kernel's FATX driver against our FATX code (PASS)
+
+xemu runs use `unshare` with an empty /dev/input so they never see the owner's controllers. A VMX image for xemu:
+`../vmx-firmware/build/vmxmu vmx.img format`, then `... install GAME.VXP`, and `... tree` to see what World did to it.
+(xemu's memory unit reports 16383 sectors through nxdk's driver for an 8 MB image; FATX's geometry comes out the same.)
 
 ## Install on the real Xbox (network loader, as FOLD)
 
@@ -69,7 +81,8 @@ Each start of VMX World asks the laptop for the build's version and downloads it
 Every picture of the model (the turning VMX's 40 steps, the big one; glow, edges, glass and bloom baked in) is made
 ahead of time on the PC (owner: "why not just do that ahead of time"): `cd xbox && make -f Makefile.pc holo` renders
 them with the same code (holo.c, holo_bake.c) into assets/vmx_holo.pak (1.4 MB, zero runs packed), which goes on the
-disc. World only loads them; a frame adds the picture, the beam and the live screen through a tint table, and the big
+disc; the same run also writes FOLD's head-on VMX pictures (microgames/fold/assets/vmx_small, vmx_large: FOLD
+BUILDER's VMX window and World's fallback when there's no .pak). World only loads them; a frame adds the picture, the beam and the live screen through a tint table, and the big
 view works out once which VMX pixel each TV pixel shows. Re-bake after changing the model (tools/hologram_export.py
 -> assets/vmx_holo.bin), the look or the views' layout (a .pak made for another layout is refused and World renders
 from the .bin instead). In xemu: 15-17 fps in PLAY, no slow start; the console's own numbers are still to come.
@@ -79,4 +92,6 @@ from the .bin instead). In xemu: 15-17 fps in PLAY, no slow start; the console's
 1. On the real Xbox (owner: upload once, run the server): looks, speed, the pad.
 2. Sound: the VMX's beeper through the Xbox's audio (vmx_audio is ready; World doesn't play it yet).
 3. GET GAMES over the network from a laptop "service" (the loader's HTTP client), not only from the disc.
-4. The real VMX as a memory unit in the controller (XMU GADGET), then SCORES online and the cashier's save editing.
+4. The real VMX in a real controller: World's side works in xemu (memory unit image) and the CoreS3 rig presents its
+   volume over USB (vmx-firmware docs/STATUS.md), but the two haven't met: needs the rig flashed and an Xbox
+   controller-port-to-USB adapter, or the VMX's own board. Then SCORES online and the cashier's save editing.

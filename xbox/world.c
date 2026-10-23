@@ -7,6 +7,7 @@
 #include "../../microgames/fold/app/gfx.h"
 #include "../../vmx-firmware/core/vmxfw.h"
 #include "hdd.h"
+#include "vmxlink.h"
 #include "holo.h"
 // ---- the hologram look (DESIGN.md "The look on the Xbox side"): the kit lives in FOLD's gfx.c, shared with FOLD BUILDER
 #define HG GFX_HG
@@ -96,7 +97,7 @@ static void header(void) {
   gtext(40, 24, 3, 0xe8ffe8, "VMX"); gtext(40 + gfx_text5_w(3, "VMX "), 24, 3, HG, "WORLD");
   add_rect(40, 48, gfx_text5_w(3, "VMX WORLD"), 1, 0x1a5a28);
   char b[64]; int blocks = 0; for (int i = 0; i < NINSTALLED; i++) blocks += (INSTALLED[i].bytes + 16383) / 16384;
-  snprintf(b, sizeof b, "%d GAMES ON THE HARD DISK  %d BLOCKS", NINSTALLED, blocks);
+  snprintf(b, sizeof b, "%d GAMES ON %s  %d BLOCKS", NINSTALLED, hdd_on_vmx() ? "YOUR VMX" : "THE HARD DISK", blocks);
   gfx_disc(600 - gfx_text5_w(1, b) - 12, 33, 4, LIT); gfx_text5(600 - gfx_text5_w(1, b), 30, 1, INK, b);
 }
 static void tabs(void) {                                 // projected tabs: slanted outlines; the open one lit
@@ -156,7 +157,7 @@ static void draw_news(void) {
 static void shop_row(int i, int x, int y, int w, int sel) {
   const Vxp *v = &CATALOG[i]; card(x, y + 2, 1, v->card, LIT, 0xff000000u);
   gfx_text5(x + 32, y + 4, 1, INK, v->title);
-  const char *st = hdd_installed(v->id) >= 0 ? "ON YOUR HARD DISK" : v->casino ? "VMX CASINO" : (v->id >> 12 & 15) == 8 ? "HOMEBREW" : "VMX STUDIO";
+  const char *st = hdd_installed(v->id) >= 0 ? (hdd_on_vmx() ? "ON YOUR VMX" : "ON YOUR HARD DISK") : v->casino ? "VMX CASINO" : (v->id >> 12 & 15) == 8 ? "HOMEBREW" : "VMX STUDIO";
   gfx_text5(x + 32, y + 15, 1, hdd_installed(v->id) >= 0 ? LIT : MUTED, st);
 }
 static void draw_detail(const Vxp *v, int y0) {
@@ -179,7 +180,7 @@ static void draw_shop(void) {
   if (W.dl && W.dlId == v->id) {
     int p = 100 - W.dl * 100 / W.dlT; gfx_frame(292, 392, 300, 16, LIT); gfx_rect(294, 394, 296 * p / 100, 12, LIT);
     gfx_text5(292, 378, 1, INK, "DOWNLOADING...");
-  } else gfx_text5(292, 392, 1, have ? LIT : 0xffffff, have ? "ON YOUR HARD DISK" : "A: DOWNLOAD TO THE HARD DISK");
+  } else gfx_text5(292, 392, 1, have ? LIT : 0xffffff, have ? (hdd_on_vmx() ? "ON YOUR VMX" : "ON YOUR HARD DISK") : hdd_on_vmx() ? "A: DOWNLOAD TO YOUR VMX" : "A: DOWNLOAD TO THE HARD DISK");
   hints(have ? NULL : "DOWNLOAD", "BACK", NULL);
 }
 
@@ -191,13 +192,13 @@ static void mine_row(int i, int x, int y, int w, int sel) {
 }
 static void draw_mine(void) {
   list(32, 100, 230, 330, NINSTALLED, W.sel[T_MINE], mine_row);
-  if (!NINSTALLED) { hpanel(276, 100, 332, 330, "MY VMX", LIT); wrap(292, 146, 300, 1, INK, "NO VMX GAMES ON THE HARD DISK YET. GET SOME IN GET GAMES.", 6); hints(NULL, "BACK", NULL); return; }
+  if (!NINSTALLED) { hpanel(276, 100, 332, 330, "MY VMX", LIT); wrap(292, 146, 300, 1, INK, hdd_on_vmx() ? "NO GAMES ON YOUR VMX YET. GET SOME IN GET GAMES." : "NO VMX GAMES ON THE HARD DISK YET. GET SOME IN GET GAMES. OR PLUG YOUR VMX INTO A CONTROLLER.", 6); hints(NULL, "BACK", NULL); return; }
   draw_detail(&INSTALLED[W.sel[T_MINE]], 0);
-  char b[80]; snprintf(b, sizeof b, "UDATA\\56580001\\%08X0000", (unsigned)INSTALLED[W.sel[T_MINE]].id); gfx_text5(292, 378, 1, MUTED, b);
+  char b[80]; snprintf(b, sizeof b, hdd_on_vmx() ? "VMX: 56580001\\%08X0000" : "UDATA\\56580001\\%08X0000", (unsigned)INSTALLED[W.sel[T_MINE]].id); gfx_text5(292, 378, 1, MUTED, b);
   gfx_text5(292, 392, 1, 0xffffff, "A: PLAY OR DELETE");
   if (W.menu) {
     gfx_dim(0, 0, 640, 480, 0.95f); hpanel(200, 180, 240, 110, INSTALLED[W.sel[T_MINE]].title, HG);
-    const char *items[2] = { "PLAY ON THE TV", "DELETE FROM THE HARD DISK" };
+    const char *items[2] = { "PLAY ON THE TV", hdd_on_vmx() ? "DELETE FROM YOUR VMX" : "DELETE FROM THE HARD DISK" };
     for (int i = 0; i < 2; i++) { int y = 222 + i * 26; if (i == W.menuSel) gfx_rect(212, y - 6, 216, 20, GREEN); gfx_text5(222, y, 1, INK, items[i]); }
     hints("SELECT", "CANCEL", NULL); return;
   }
@@ -374,6 +375,7 @@ void app_init(const char *levelsDir) {
 int app_quit(void) {                                   // Back + Start in World's menus: back to the dashboard
   return !W.playing && (W.prev & (PAD_BACK | PAD_START)) == (PAD_BACK | PAD_START);   // (BACK START hint)
 }
+void app_usb_init(void) { vmxlink_init(); }        // the VMX in a controller: USB mass storage
 int app_load(const char *path) { (void)path; return 0; }
 int app_save(const char *path) { (void)path; return 0; }
 int app_state(char *b, int n) {
@@ -390,9 +392,14 @@ void app_frame(const Pad *pad) {
   if (pad->lx < -0.6f) held |= PAD_LEFT; if (pad->lx > 0.6f) held |= PAD_RIGHT;
   unsigned e = held & ~W.prev; W.prev = held; W.t++;
   holo_prepare();                                     // the hologram's pictures, one a tick until ready
+  if (vmxlink_poll()) {                               // a VMX came or went: its games, saves and chips are World's now
+    W.playing = W.menu = 0; hdd_scan(); vmx_reload(); load_scores();
+    for (int t = 0; t < NTABS; t++) if (W.sel[t] >= count(t)) W.sel[t] = count(t) ? count(t) - 1 : 0;
+    toast(hdd_on_vmx() ? "VMX PLUGGED IN" : vmxlink_other() ? "THAT MEMORY UNIT ISN'T A VMX" : "VMX UNPLUGGED");
+  }
   if (W.toastT) W.toastT--;
   if (W.dl && --W.dl == 0) {                           // a download finished: on to the hard disk
-    for (int i = 0; i < NCATALOG; i++) if (CATALOG[i].id == W.dlId) { if (hdd_install(&CATALOG[i])) { toast("DOWNLOADED"); W.gamesDirty = 1; } else toast("COULDN'T WRITE THE HARD DISK"); }
+    for (int i = 0; i < NCATALOG; i++) if (CATALOG[i].id == W.dlId) { if (hdd_install(&CATALOG[i])) { toast("DOWNLOADED"); W.gamesDirty = 1; } else toast(hdd_on_vmx() ? "COULDN'T WRITE YOUR VMX" : "COULDN'T WRITE THE HARD DISK"); }
   }
   if (W.playing) {                                     // the VMX has the pad; Y gives it back to World
     int b = 0;

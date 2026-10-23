@@ -1,9 +1,13 @@
 // VMX World's files: see hdd.h. One VMX game = one save folder, UDATA\56580001\<game ID>0000\ holding GAME.VXP and
 // SaveMeta.xbx ("Name=..." in UTF-16, which the dashboard's Memory screen shows), under a TitleMeta.xbx that names the
-// title "VMX World". The VMX's storage (the firmware's plat_* keys) is UDATA\56580001\VMX\<key>.BIN for now: the
-// VMX in the controller isn't real yet (XMU GADGET), so World keeps a VMX of its own on the hard disk.
+// title "VMX World". The VMX's storage (the firmware's plat_* keys) is UDATA\56580001\VMX\<key>.BIN.
+// With a VMX plugged into a controller (vmxlink.c) all of that is on the VMX instead, in the same layout at the root of
+// its memory-unit volume (vmx-firmware/core/vmxvol.h): MY VMX, PLAY, installs and SCORES use it; the hard disk's copy
+// is World's own VMX for when none is plugged in. Paths starting "VMX:" are on the VMX.
 #include "hdd.h"
 #include "../../vmx-firmware/core/vmxfw.h"
+#include "../../vmx-firmware/core/vmxvol.h"
+#include "vmxlink.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +64,11 @@ static int each_entry(const char *dir, void (*fn)(const char *dir, const char *n
   return n;
 }
 uint8_t *hdd_read(const char *path, int *len) {
+  if (!strncmp(path, "VMX:", 4)) {
+    Fatx *v = vmxlink_vol(); int n = v ? fatx_size(v, path + 4) : -1; if (n < 0) return NULL;
+    uint8_t *b = malloc((size_t)n + 1); if (b && fatx_read(v, path + 4, b, n) != n) { free(b); return NULL; }
+    if (len) *len = n; return b;
+  }
   FILE *f = fopen(path, "rb"); if (!f) return NULL;
   int cap = 65536, n = 0; uint8_t *b = malloc((size_t)cap);       // (no ftell: unreliable on nxdk)
   while (b) {
@@ -125,7 +134,11 @@ static void inst_entry(const char *dir, const char *name, int isDir, void *u) { 
 void hdd_scan(void) {
   NCATALOG = NINSTALLED = 0;
   each_entry(DISC "catalog" SEP, cat_entry, NULL);
-  each_entry(WORLD, inst_entry, NULL);
+  Fatx *vmx = vmxlink_vol();
+  if (vmx) {                                            // the VMX's own games
+    uint32_t ids[MAXVXP]; int n = vol_games(vmx, ids, MAXVXP);
+    for (int i = 0; i < n; i++) { char p[48]; memcpy(p, "VMX:", 4); vol_game_path(ids[i], p + 4); if (parse_vxp(p, &INSTALLED[NINSTALLED])) NINSTALLED++; }
+  } else each_entry(WORLD, inst_entry, NULL);
   qsort(CATALOG, (size_t)NCATALOG, sizeof(Vxp), by_title);
   qsort(INSTALLED, (size_t)NINSTALLED, sizeof(Vxp), by_title);
 }
@@ -133,6 +146,7 @@ int hdd_installed(uint32_t id) { for (int i = 0; i < NINSTALLED; i++) if (INSTAL
 static void save_dir(uint32_t id, char *out, int n) { snprintf(out, (size_t)n, WORLD "%08X0000", (unsigned)id); }
 int hdd_install(const Vxp *v) {
   int n = 0; uint8_t *d = hdd_read(v->path, &n); if (!d) return 0;
+  if (vmxlink_vol()) { int ok = vol_install(vmxlink_vol(), v->id, v->title, d, n); free(d); hdd_scan(); return ok; }
   char dir[200], p[260]; save_dir(v->id, dir, sizeof dir); mkdir_(dir);
   snprintf(p, sizeof p, "%s" SEP "GAME.VXP", dir); int ok = write_file(p, d, n); free(d);
   snprintf(p, sizeof p, "%s" SEP "SaveMeta.xbx", dir); ok = ok && write_meta(p, "Name", v->title);
@@ -143,6 +157,7 @@ static void rm_entry(const char *dir, const char *name, int isDir, void *u) {
   if (!isDir) remove(p);
 }
 int hdd_remove(uint32_t id) {
+  if (vmxlink_vol()) { int ok = vol_remove(vmxlink_vol(), id); hdd_scan(); return ok; }
   char dir[200], d2[210]; save_dir(id, dir, sizeof dir); snprintf(d2, sizeof d2, "%s" SEP, dir);
   each_entry(d2, rm_entry, NULL);
 #ifdef NXDK
@@ -177,15 +192,19 @@ void hdd_init(void) {
 // ---- the VMX firmware's platform calls (vmx-firmware/core/vmxfw.h), on World's VMX storage
 void *plat_alloc(size_t n) { return calloc(1, n); }
 void *plat_alloc_fast(size_t n) { return calloc(1, n); }
+int hdd_on_vmx(void) { return vmxlink_vol() != NULL; }
 int plat_load(const char *key, void *buf, int max) {
+  if (vmxlink_vol()) return vol_load(vmxlink_vol(), key, buf, max);
   char p[200]; snprintf(p, sizeof p, "%s%s.BIN", hdd_vmx_dir(), key);
   FILE *f = fopen(p, "rb"); if (!f) return 0;
   int n = (int)fread(buf, 1, (size_t)max, f); fclose(f); return n;
 }
 void plat_save(const char *key, const void *buf, int n) {
+  if (vmxlink_vol()) { vol_save(vmxlink_vol(), key, buf, n); return; }
   char p[200]; snprintf(p, sizeof p, "%s%s.BIN", hdd_vmx_dir(), key); write_file(p, buf, n);
 }
 int plat_day(void) { return hdd_day(); }
 const char *plat_name(void) { return "VMX WORLD"; }
 int plat_wifi(char lines[4][16]) { (void)lines; return 0; }
 void plat_wifi_setup(void) {}
+void plat_link_eject(void) {}

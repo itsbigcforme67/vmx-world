@@ -1,0 +1,19 @@
+# xemu with a VMX image as a memory unit (tools/run_xemu.sh --mu): MY VMX lists the VMX's games, then a download goes
+# onto the VMX, then MY VMX again (World plays this from D:\demo.txt)
+wait 200
+R
+R
+A
+wait 2
+wait 150
+B
+L
+A
+wait 2
+A
+wait 150
+B
+R
+A
+wait 2
+wait 600

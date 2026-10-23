@@ -7,3 +7,4 @@ xbox/build/
 *.c.d
 xbox/main.exe
 xbox/loader/main.exe
+xbox/tests/kernel_fatx/main.exe

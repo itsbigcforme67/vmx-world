@@ -185,6 +185,38 @@ int holo_bake(const char *out) {
   fclose(f); printf("%s: %ld bytes of pictures\n", out, total);
   return 1;
 }
+// FOLD's VMX pictures (microgames/fold/assets/vmx_small, vmx_large: its VMX window, World's fallback): the model
+// head-on, so the live 64x64 screen is a plain rectangle, sized so a VMX pixel is sc screen pixels, cropped to the
+// top part round the screen with a fade at the cut. "VMXF", w, h, screen x, screen y (u16), then w*h RGBA: the glow
+// as green light (colour and alpha from the tint table, so drawn over the dark panels it adds up like World's)
+int holo_bake_fold(const char *out, int sc, int side, int extra) {
+  if (!loaded) return 0;
+  float d = 160.0f / (160.0f - SCR_Z), scale = 64.0f * sc / ((SCR_X1 - SCR_X0) * d);
+  float xmax = 0, ymax = -1e9f, zmax = -1e9f;
+  for (int i = 0; i < nP; i++) { float x = fabsf(P[i].x * 0.01f), y = P[i].y * 0.01f, z = P[i].z * 0.01f; if (x > xmax) xmax = x; if (y > ymax) ymax = y; if (z > zmax) zmax = z; }
+  float dz = 160.0f / (160.0f - zmax), cy0 = (SCR_Y0 + SCR_Y1) * 0.5f;
+  int m = 18, full = (int)(2 * xmax * dz * scale) + 2 * m;
+  View v = { 0 }; v.centreY = cy0; v.scale = scale; v.cx = full * 0.5f; v.cy = (ymax - cy0) * dz * scale + m;
+  int sx = (int)lroundf(v.cx + SCR_X0 * d * scale), sy = (int)lroundf(v.cy - (SCR_Y1 - cy0) * d * scale);
+  v.cx += sx - (v.cx + SCR_X0 * d * scale); v.cy += sy - (v.cy - (SCR_Y1 - cy0) * d * scale);   // the screen on whole pixels
+  v.w = full; v.h = sy + 64 * sc + extra;
+  rotation(0, 0);
+  uint8_t *pic = render(&v, 0, 0); if (!pic) return 0;
+  int left = side < 0 ? 0 : sx - side, right = side < 0 ? v.w : sx + 64 * sc + side;
+  if (left < 0) left = 0; if (right > v.w) right = v.w;
+  int w = right - left, h = v.h, fade = extra < 24 ? extra : 24;
+  FILE *f = fopen(out, "wb"); if (!f) { free(pic); return 0; }
+  uint16_t hd[4] = { (uint16_t)w, (uint16_t)h, (uint16_t)(sx - left), (uint16_t)sy }; fwrite("VMXF", 1, 4, f); fwrite(hd, 2, 4, f);
+  for (int y = 0; y < h; y++) for (int x = left; x < right; x++) {
+    int i = pic[y * v.w + x]; if (y > h - fade) i = i * (h - y) / fade;
+    const uint8_t *t = TINT[i]; int a = t[0] > t[1] ? t[0] : t[1]; if (t[2] > a) a = t[2];
+    uint8_t px[4] = { 0, 0, 0, (uint8_t)a };
+    if (a) for (int k = 0; k < 3; k++) px[k] = (uint8_t)(t[k] * 255 / a);
+    fwrite(px, 1, 4, f);
+  }
+  fclose(f); free(pic); printf("%s: %dx%d, screen at %d,%d\n", out, w, h, sx - left, sy);
+  return 1;
+}
 #endif
 int holo_load_baked(const char *path) {
   int n = 0; uint8_t *d = hdd_read(path, &n), *p;

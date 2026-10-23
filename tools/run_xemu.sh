@@ -6,17 +6,19 @@
 #   tools/run_xemu.sh --shot out.png --after "20 40"     screenshots at those seconds, then quit
 #   --fresh   a new, empty hard disk first;  --record out.mp4  also record
 #   --xbe FILE  boot a DVD holding only FILE;  --net  xemu's NAT network (the laptop is 10.0.2.2);  --hdd FILE  another disk
+#   --mu FILE  a memory unit (a raw 8 MB image, e.g. a VMX's: vmx-firmware/build/vmxmu) in controller 1's first slot
+#              (controller 1 is then xemu's keyboard pad; the pad script still drives World)
 set -e
 cd "$(dirname "$0")/.."
 XF=${XBOX_FILES:-"$HOME/claude projects/MH XBOX/mh1-xbox/xbox_files"}
 MH="$HOME/claude projects/MH XBOX/mh1-xbox"
 FOLD="$PWD/../microgames/fold"
 XEMU=${XEMU:-$HOME/xboxdev/xemu/xemu-0.8.136-x86_64.AppImage}
-SHOT=""; AFTER=30; REC=; FRESH=; XBE=; NET=; HDDARG=
+SHOT=""; AFTER=30; REC=; FRESH=; XBE=; NET=; HDDARG=; MU=
 while [ $# -gt 0 ]; do
     case "$1" in
     --shot) SHOT=$2; shift 2 ;; --after) AFTER=$2; shift 2 ;; --record) REC=$2; shift 2 ;; --fresh) FRESH=1; shift ;;
-    --xbe) XBE=$2; shift 2 ;; --net) NET=1; shift ;; --hdd) HDDARG=$2; shift 2 ;;
+    --xbe) XBE=$2; shift 2 ;; --net) NET=1; shift ;; --hdd) HDDARG=$2; shift 2 ;; --mu) MU=$(realpath "$2"); shift 2 ;;
     *) echo "unknown option $1"; exit 2 ;;
     esac
 done
@@ -39,6 +41,7 @@ eeprom_path = '$W/eeprom.bin'
 hdd_path = '$HDD'
 dvd_path = '$ISO'
 TOML
+[ -z "$MU" ] || printf "[input.bindings]\nport1_driver = 'usb-xbox-gamepad'\nport1 = 'keyboard'\n[input.peripherals.port1]\nperipheral_type_0 = 1\nperipheral_param_0 = '%s'\n" "$MU" >> "$W/home/xemu/xemu/xemu.toml"
 [ -z "$NET" ] || printf '[net]\nenable = true\nbackend = '"'"'nat'"'"'\n' >> "$W/home/xemu/xemu/xemu.toml"
 export XDG_DATA_HOME="$W/home"
 DBG="$W/serial.txt"; : > "$DBG"
