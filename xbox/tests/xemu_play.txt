@@ -1,0 +1,24 @@
+# install 3 CARD POKER (first in the catalogue), turn on the VMX, start the game, deal a hand
+wait 150
+R
+A
+wait 2
+A
+wait 90
+B
+R
+R
+A
+wait 2
+A
+wait 30
+A
+wait 180
+A
+wait 45
+A
+wait 90
+A
+wait 45
+A
+wait 120

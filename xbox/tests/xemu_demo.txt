@@ -1,0 +1,33 @@
+# xemu: download two games, open the VMX, back to World, then SCORES (World plays this from D:\demo.txt)
+wait 150
+R
+A
+wait 2
+A
+wait 120
+DOWN
+DOWN
+DOWN
+DOWN
+DOWN
+A
+wait 120
+B
+R
+R
+A
+wait 2
+A
+wait 2
+A
+wait 150
+A
+wait 30
+A
+wait 60
+Y
+wait 10
+R
+A
+DOWN
+wait 200

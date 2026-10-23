@@ -72,3 +72,11 @@ the shared bank; the cashier opens with any casino game installed.
 ## 2026-10-22 end: 18 casino tables
 All in GET GAMES (casino shelf) and the cashier's list: see CASINO.md. `tools/add_casino_table.py` wires a new table in.
 `docs/CASINO_TABLE_BRIEF.md` is the brief the helpers built them from.
+
+## 2026-10-22: World on the Xbox, for real (docs/XBOX.md)
+Owner: "Let's get world onto the Xbox for real". `xbox/`: the TV app in C on nxdk (FOLD's renderer and platform
+layer), with the real VMX firmware + .NET runtime + all 27 games inside PLAY; installs are real saves under
+E:\UDATA\56580001 (TitleMeta/SaveMeta for the dashboard); XBE title ID 56580001. Checked in hidden xemu (formatted
+scratch disk, no real pads): every tab, a download, a 3 CARD POKER hand on the VMX (same screen as the PC build), and
+the network loader end to end (tools/xemu_loader_test.sh: 7/7). NOT on the real Xbox yet: it was off; the owner runs
+tools/xbox_upload.sh once (FTP login) and keeps tools/xbox_serve.py (port 8771) running.

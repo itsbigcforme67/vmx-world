@@ -1,0 +1,18 @@
+# VMX World's TV app on the PC, without a window: build/world_headless runs a pad script and saves screenshots
+# (FOLD's headless runner). The disc is build/disc/ (catalog/ = the VMX games, assets/ = the VMX render), the hard
+# disk build/hdd/. Run from vmx-world/xbox/:   make -f Makefile.pc && build/world_headless tests/tour.txt
+FOLD = ../../microgames/fold
+FW = ../../vmx-firmware
+SRC = world.c hdd.c $(FOLD)/app/gfx.c $(FOLD)/app/main_headless.c \
+      $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c $(FW)/core/game_fold.c \
+      $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c $(FOLD)/core/fold.c $(FOLD)/app/vmx.c
+CFLAGS = -O2 -Wall -Wno-unused-parameter -Wno-misleading-indentation -std=gnu11
+build/world_headless: $(SRC) *.h disc
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $(SRC) -lm
+# the World disc: every VMX game the firmware repo has built, and the VMX render
+disc:
+	mkdir -p build/disc/catalog build/disc/assets
+	cp $(FW)/build/games/*.VXP build/disc/catalog/
+	cp $(FOLD)/assets/vmx_large.rgba $(FOLD)/assets/vmx_small.rgba build/disc/assets/
+.PHONY: disc

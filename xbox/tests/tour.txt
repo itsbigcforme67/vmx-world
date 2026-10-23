@@ -1,0 +1,54 @@
+# a tour of every tab (headless): build/world_headless tests/tour.txt
+wait 10
+shot build/shots/01_news.ppm
+R
+A
+wait 2
+shot build/shots/02_shop.ppm
+A
+wait 80
+DOWN
+DOWN
+A
+wait 80
+DOWN
+DOWN
+DOWN
+shot build/shots/03_shop_more.ppm
+B
+R
+A
+wait 2
+shot build/shots/04_mine.ppm
+B
+R
+A
+wait 2
+shot build/shots/05_play.ppm
+A
+wait 2
+A
+wait 150
+shot build/shots/06_vmx_boot.ppm
+A
+wait 30
+A
+wait 40
+shot build/shots/07_vmx_games.ppm
+Y
+wait 2
+B
+R
+A
+wait 2
+DOWN
+DOWN
+shot build/shots/08_scores.ppm
+B
+R
+A
+DOWN
+A
+wait 2
+shot build/shots/09_cashier.ppm
+state
