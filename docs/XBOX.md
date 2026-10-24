@@ -83,6 +83,16 @@ Each start of VMX World asks the laptop for the build's version and downloads it
   the picture itself, or the VMX render's soft edges blend with black.
 - vmx-firmware/core/surf.c's stand-in `gfx_glyph` is weak, so builds that link FOLD's gfx.c use FOLD's.
 - xemu's frame rate (20-25 fps here) isn't the console's: real numbers need the hardware.
+- XLaunchXBE leaves the USB host controller and the GPU running, and their DMA writes into the next program's
+  memory: FOLD's network loader froze half way through its download when World started it (real Xbox, 24 Oct
+  2026). World starts other XBEs with FOLD's `fold_launch` (SDL_Quit, usbh_core_deinit, pb_kill, then XLaunchXBE).
+  Fixed and checked on the console the same day.
+
+## On the real Xbox (2026-10-24)
+Both loaders installed (tools/xbox_upload.sh, the owner typed the FTP login); the console is at 192.168.1.115 and
+only takes an address when it boots with the cable in. VMX World downloaded its 4.3 MB build and runs; APPLETS >
+FOLD BUILDER starts FOLD's loader, which downloads and starts FOLD. Not yet checked: the VMX through a hub on the
+controller-port adapter, frame rates.
 
 ## The hologram's cost
 
