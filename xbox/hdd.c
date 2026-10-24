@@ -9,6 +9,7 @@
 #include "../../vmx-firmware/core/vmxfw.h"
 #include "../../vmx-firmware/core/vmxvol.h"
 #include "vmxlink.h"
+#include "../../microgames/fold/core/vmxfit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,6 +133,7 @@ static void inst_entry(const char *dir, const char *name, int isDir, void *u) { 
   char p[300]; snprintf(p, sizeof p, "%s%s" SEP "GAME.VXP", dir, name);
   if (parse_vxp(p, &INSTALLED[NINSTALLED])) NINSTALLED++;
 }
+static void fold_sync(void);
 void hdd_scan(void) {
   NCATALOG = NINSTALLED = 0;
   each_entry(DISC "catalog" SEP, cat_entry, NULL);
@@ -142,6 +144,7 @@ void hdd_scan(void) {
   } else each_entry(WORLD, inst_entry, NULL);
   qsort(CATALOG, (size_t)NCATALOG, sizeof(Vxp), by_title);
   qsort(INSTALLED, (size_t)NINSTALLED, sizeof(Vxp), by_title);
+  fold_sync();
 }
 int hdd_installed(uint32_t id) { for (int i = 0; i < NINSTALLED; i++) if (INSTALLED[i].id == id) return i; return -1; }
 static void save_dir(uint32_t id, char *out, int n) { snprintf(out, (size_t)n, WORLD "%08X0000", (unsigned)id); }
@@ -168,7 +171,13 @@ int hdd_games_on(int dev) {
 }
 static void rm_entry(const char *dir, const char *name, int isDir, void *u) {
   char p[300]; snprintf(p, sizeof p, "%s%s", dir, name);
-  if (!isDir) remove(p);
+  if (!isDir) { remove(p); return; }
+  char d2[310]; snprintf(d2, sizeof d2, "%s" SEP, p); each_entry(d2, rm_entry, NULL);   // DATA\ (files given to the game)
+#ifdef NXDK
+  RemoveDirectoryA(p);
+#else
+  rmdir(p);
+#endif
 }
 int hdd_remove(uint32_t id) {
   if (vmxlink_vol()) { int ok = vol_remove(vmxlink_vol(), id); hdd_scan(); return ok; }
@@ -225,6 +234,7 @@ void plat_save(const char *key, const void *buf, int n) {
   if (f) {                                               // a save folder, named for the dashboard
     char d[200], m[220]; snprintf(d, sizeof d, WORLD "%08X0000", (unsigned)f); mkdir_(d);
     snprintf(m, sizeof m, "%s" SEP "SaveMeta.xbx", d); if (!hdd_exists(m)) write_meta(m, "Name", vol_title(f));
+    if (key[0] == 'd') { snprintf(m, sizeof m, "%s" SEP "DATA", d); mkdir_(m); }   // a file given to the game
   }
   write_file(p, buf, n);
 }
@@ -233,3 +243,52 @@ const char *plat_name(void) { return "VMX WORLD"; }
 int plat_wifi(char lines[4][16]) { (void)lines; return 0; }
 void plat_wifi_setup(void) {}
 void plat_link_eject(void) {}
+
+// ---- FOLD BUILDER's levels onto the VMX (or World's own): FOLD ROOMS plays them after its own. The builder saves new
+// levels as user-NNN.fold in its levels folder; they go, in name order, into FOLD ROOMS' save folder as
+// DATA\LEVELS.BIN (games/fold/levels.py's layout: u16 count, count + 1 u32 offsets, the texts), the firmware key
+// "d56581010:LEVELS.BIN". Levels too big for the VMX's heap (core/vmxfit.h) stay off it, and all of them together
+// must fit 64 KB. Done whenever World looks at a VMX's games (hdd_scan): written only when it changed.
+#define FOLD_ROOMS 0x56581010u
+#define FOLD_KEY "d56581010:LEVELS.BIN"
+static char foldDir[260], foldNote[64];
+void hdd_fold_dir(const char *dir) { snprintf(foldDir, sizeof foldDir, "%s", dir); }
+const char *hdd_fold_note(void) { return foldNote; }
+void hdd_fold_note_clear(void) { foldNote[0] = 0; }
+static char fnames[64][64]; static int nfnames;
+static void fold_entry(const char *dir, const char *name, int isDir, void *u) {
+  size_t l = strlen(name);
+  if (isDir || nfnames >= 64 || l < 10 || strncmp(name, "user-", 5) || strcmp(name + l - 5, ".fold")) return;
+  snprintf(fnames[nfnames++], 64, "%s", name);
+}
+static int by_name(const void *a, const void *b) { return strcmp((const char *)a, (const char *)b); }
+static void fold_sync(void) {
+  static uint8_t pack[FOLD_VMX_PACK], old[FOLD_VMX_PACK + 1];
+  if (!foldDir[0]) return;
+  int on = 0; for (int i = 0; i < NINSTALLED; i++) if (INSTALLED[i].id == FOLD_ROOMS) on = 1;
+  if (!on) return;                                    // (installing FOLD ROOMS scans again, and brings them)
+  nfnames = 0; each_entry(foldDir, fold_entry, NULL);
+  qsort(fnames, (size_t)nfnames, sizeof fnames[0], by_name);
+  static uint8_t *text[64]; static int len[64]; int n = 0, big = 0, full = 0;
+  for (int i = 0; i < nfnames; i++) {
+    char p[400]; snprintf(p, sizeof p, "%s%s", foldDir, fnames[i]);
+    int k = 0; uint8_t *t = hdd_read(p, &k); if (!t) continue;
+    if (!fold_fits_vmx(fold_count_squares((const char *)t, k), k)) { big++; free(t); continue; }
+    int used = 2 + 4 * (n + 2); for (int j = 0; j < n; j++) used += len[j];
+    if (used + k > FOLD_VMX_PACK) { full++; free(t); continue; }
+    text[n] = t; len[n++] = k;
+  }
+  int total = 2 + 4 * (n + 1), o = total;
+  pack[0] = (uint8_t)n; pack[1] = (uint8_t)(n >> 8);
+  for (int i = 0; i <= n; i++) {
+    for (int b = 0; b < 4; b++) pack[2 + 4 * i + b] = (uint8_t)(o >> (8 * b));
+    if (i < n) { memcpy(pack + o, text[i], (size_t)len[i]); o += len[i]; free(text[i]); }
+  }
+  total = o;
+  int had = plat_load(FOLD_KEY, old, sizeof old);
+  if (n ? had == total && !memcmp(old, pack, (size_t)total) : had <= 0) return;   // already there
+  plat_save(FOLD_KEY, n ? pack : NULL, total);
+  if (vmxlink_vol()) vmxlink_refresh();
+  if (big || full) snprintf(foldNote, sizeof foldNote, "FOLD: %d LEVEL%s SENT, %d TOO BIG FOR THE VMX", n, n == 1 ? "" : "S", big + full);
+  else snprintf(foldNote, sizeof foldNote, "FOLD: %d LEVEL%s SENT TO THE VMX", n, n == 1 ? "" : "S");
+}

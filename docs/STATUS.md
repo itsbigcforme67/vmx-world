@@ -80,3 +80,11 @@ E:\UDATA\56580001 (TitleMeta/SaveMeta for the dashboard); XBE title ID 56580001.
 scratch disk, no real pads): every tab, a download, a 3 CARD POKER hand on the VMX (same screen as the PC build), and
 the network loader end to end (tools/xemu_loader_test.sh: 7/7). NOT on the real Xbox yet: it was off; the owner runs
 tools/xbox_upload.sh once (FTP login) and keeps tools/xbox_serve.py (port 8771) running.
+
+## 2026-10-24: FOLD BUILDER's levels go onto the VMX
+`xbox/hdd.c` fold_sync: at every hdd_scan (start, a VMX plugged in or chosen, an install) the levels the builder saved
+(`user-*.fold` in the levels folder next to its XBE, E:\Games\FOLD\levels or the TDATA content's) are packed into
+FOLD ROOMS' `DATA\LEVELS.BIN` on the VMX in use (or World's own on the hard disk), if FOLD ROOMS is there and they
+changed; a toast says how many went and how many were too big for the VMX's heap (microgames/fold/core/vmxfit.h).
+At most 64 KB of them. FOLD ROOMS lists them after its own levels (vmx-firmware/docs/STATUS.md, same date). Deleting
+a game on the hard disk now also clears its DATA\ folder. Checked in the PC build (world_headless); the XBE builds, not run in xemu yet.

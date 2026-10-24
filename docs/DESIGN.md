@@ -72,6 +72,8 @@ UDATA\56580001\                      VMX World ("VMX World" in the dashboard's M
         GAME.VXP                     the game (the package, below); absent for a game built into the VMX
         SAVE.BIN                     the game's own save (progress; up to 16 KB)
         RECORD.BIN                   its scores as the VMX keeps them (best, won/lost/drawn, what CALL sent)
+        DATA\                        files the Xbox gives the game, read only (FOLD ROOMS: LEVELS.BIN, the levels
+                                     made in FOLD BUILDER, written by World)
     56581F000000\                    "VMX CASINO CHIPS": CHIPS.BIN, the stash every casino game shares (score record 56581F00)
     565880010000\                    a homebrew game, same shape
 

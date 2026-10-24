@@ -409,7 +409,10 @@ void app_init(const char *levelsDir) {
 #else
   haveHolo = holo_load_baked("build/disc/assets/vmx_holo.pak") || holo_load("build/disc/assets/vmx_holo.bin");
 #endif
-  LOG("init"); hdd_init(); LOG("hdd ok"); vmx_reload(); LOG("vmx ok"); load_scores(); LOG("ready");
+  LOG("init"); hdd_init(); LOG("hdd ok");
+  const char *fx = fold_xbe();                         // FOLD BUILDER's levels folder, next to it: onto the VMX (hdd.h)
+  if (fx) { char d[260]; snprintf(d, sizeof d, "%.*slevels" SEP_, (int)(strrchr(fx, SEP_[0]) + 1 - fx), fx); hdd_fold_dir(d); hdd_scan(); }
+  vmx_reload(); LOG("vmx ok"); load_scores(); LOG("ready");
   // the brushed metal FOLD's panels use (not needed for World's own look, but the font and panels come from gfx.c)
 }
 int app_quit(void) {                                   // Back + Start in World's menus: back to the dashboard
@@ -439,6 +442,7 @@ void app_frame(const Pad *pad) {
     toast(vmxlink_event());
   }
   if (W.toastT) W.toastT--;
+  if (hdd_fold_note()[0] && !W.toastT) { toast(hdd_fold_note()); hdd_fold_note_clear(); }
   if (W.dl && --W.dl == 0) {                           // a download finished: onto the VMX it was meant for
     int to = dev_of(W.dlTo), was = vmxlink_selected(); char l[40]; vmxlink_label(to, l, sizeof l);
     if (W.dlTo && to < 0) toast("THAT VMX WAS UNPLUGGED");

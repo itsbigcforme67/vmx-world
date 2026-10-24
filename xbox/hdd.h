@@ -29,4 +29,9 @@ uint8_t *hdd_read(const char *path, int *len);       // a whole file (malloc), o
 int  hdd_exists(const char *path);
 int  hdd_title_saves(uint32_t titleId);              // how many save folders a title has on the disk (0 = none)
 int  hdd_day(void);                                  // days since 15 Nov 2001
+// FOLD BUILDER's levels (user-*.fold in dir, ending in a separator) go onto the VMX for FOLD ROOMS at each hdd_scan;
+// hdd_fold_note: what the last one sent ("FOLD: 2 LEVELS SENT TO THE VMX"), "" if nothing changed (World clears it)
+void hdd_fold_dir(const char *dir);
+const char *hdd_fold_note(void);
+void hdd_fold_note_clear(void);
 #endif
