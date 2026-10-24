@@ -27,6 +27,7 @@
 #ifdef NXDK
 #include <hal/xbox.h>
 void fold_serial(const char *s);                           // main_xbox.c: a line out of COM1 (xemu's serial.txt)
+void fold_launch(const char *xbe);                           // main_xbox.c: start another XBE, USB and GPU stopped first
 #define LOG(s) fold_serial("WORLD: " s "\n")
 #else
 #define LOG(s) ((void)0)
@@ -513,7 +514,7 @@ void app_frame(const Pad *pad) {
       if (*s == 1) { W.applet = 2; W.appSel = 0; load_scores(); }
       else if (FOLD_XBE) {
 #ifdef NXDK
-        XLaunchXBE(FOLD_XBE);
+        fold_launch(FOLD_XBE);                         // (stops USB and the GPU first: FOLD's main_xbox.c)
 #else
         toast("WOULD START FOLD BUILDER");
 #endif
