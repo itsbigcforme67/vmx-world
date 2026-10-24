@@ -453,7 +453,7 @@ void app_frame(const Pad *pad) {
     if (held & PAD_UP) b |= B_UP; if (held & PAD_DOWN) b |= B_DOWN; if (held & PAD_LEFT) b |= B_LEFT; if (held & PAD_RIGHT) b |= B_RIGHT;
     if (held & PAD_A) b |= B_A; if (held & PAD_B) b |= B_B; if (held & PAD_BACK) b |= B_SIDE;
     W.vmxMs += 33; vmx_frame(W.vmxMs, b);
-    if (e & PAD_Y) { W.playing = 0; load_scores(); }
+    if (e & PAD_Y) { vmx_save_now(); W.playing = 0; load_scores(); }
     return;
   }
   if (W.choose) {                                      // the VMX chooser: the VMXs, then the hard disk
@@ -463,7 +463,7 @@ void app_frame(const Pad *pad) {
     if (e & (PAD_B | PAD_X)) W.choose = 0;
     if (e & PAD_A) {
       int dev = W.chooseSel < vmxlink_count() ? W.chooseSel : -1;
-      if (W.choose == 1) { W.choose = 0; if (dev != vmxlink_selected()) { vmxlink_select(dev); storage_changed(); char l[40], b[64]; vmxlink_label(dev, l, sizeof l); snprintf(b, sizeof b, "USING %s", l); toast(b); } }
+      if (W.choose == 1) { W.choose = 0; if (dev != vmxlink_selected()) { vmx_save_now(); vmxlink_select(dev); storage_changed(); char l[40], b[64]; vmxlink_label(dev, l, sizeof l); snprintf(b, sizeof b, "USING %s", l); toast(b); } }
       else if (!hdd_has_game(dev, W.dlId) && hdd_room(dev, W.dlBytes)) {
         W.choose = 0; W.dlTo = dev >= 0 ? vmxlink_info(dev)->sys.serial : 0; W.dlT = W.dl = 30 + W.dlBytes / 1200;
       }
