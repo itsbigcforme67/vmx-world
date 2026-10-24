@@ -40,8 +40,25 @@ static int write_file(const char *path, const void *p, int n) {   /* one WriteFi
   ok = WriteFile(h, p, (DWORD)n, &done, NULL);
   return CloseHandle(h) && ok && done == (DWORD)n ? 0 : -1;
 }
+/* nxdk's nxNetShutdown() does nothing: the network card went on writing incoming packets (broadcasts) into this
+ * program's freed receive buffers, i.e. into the next program's memory (found on the real Xbox, 24 Oct 2026).
+ * Stop it as nvnetdrv_stop does. */
+static void nic_stop(void) {
+  volatile ULONG *r = MmMapIoSpace(0xFEF00000, 0x1000, PAGE_READWRITE | PAGE_NOCACHE);
+  int i;
+  if (!r) return;
+  r[0x004 / 4] = 0; r[0x184 / 4] = 0;                  /* no interrupts */
+  r[0x094 / 4] &= ~1u; r[0x084 / 4] &= ~1u;            /* receiver, transmitter: stop */
+  for (i = 0; i < 5000 && ((r[0x098 / 4] | r[0x088 / 4]) & 1); i++) KeStallExecutionProcessor(10);
+  r[0x144 / 4] = 0x4;                                  /* DMA off, wait for idle */
+  for (i = 0; i < 2000 && !(r[0x144 / 4] & 0x8); i++) KeStallExecutionProcessor(50);
+  r[0x144 / 4] = 0x4 | 0x10; KeStallExecutionProcessor(10); r[0x144 / 4] = 0x4;
+  r[0x100 / 4] = 0; r[0x104 / 4] = 0;
+  r[0x000 / 4] = r[0x000 / 4];
+  MmUnmapIoSpace((PVOID)r, 0x1000);
+}
 static void launch(const char *xbe) {          /* stop the NIC first: the next program hangs in nxNetInit otherwise */
-  if (net_up) nxNetShutdown();
+  if (net_up) { nxNetShutdown(); nic_stop(); }
   XLaunchXBE(xbe);
 }
 static void start_game(void) {

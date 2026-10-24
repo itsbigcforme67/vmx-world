@@ -90,9 +90,24 @@ Each start of VMX World asks the laptop for the build's version and downloads it
 
 ## On the real Xbox (2026-10-24)
 Both loaders installed (tools/xbox_upload.sh, the owner typed the FTP login); the console is at 192.168.1.115 and
-only takes an address when it boots with the cable in. VMX World downloaded its 4.3 MB build and runs; APPLETS >
-FOLD BUILDER starts FOLD's loader, which downloads and starts FOLD. Not yet checked: the VMX through a hub on the
-controller-port adapter, frame rates.
+only takes an address when it boots with the cable in. VMX World and FOLD (from APPLETS) download and run. With a
+USB hub on the controller-port adapter holding the owner's ESP32 pad dongle and the CoreS3 VMX: "1 PAD, 1 MEMORY
+UNIT (1 VMX)", the pad works and the VMX shows MEMORY UNIT / CONNECTED. Getting there found three bugs:
+- **The network card kept running after the loader** (nxdk's `nxNetShutdown()` is empty): every broadcast packet on
+  the LAN went on landing in the loader's old receive buffers, which by then were World's memory: nxdk's USB pool
+  showed blocks overwritten with `FF FF FF FF ...` (broadcast frames) before the first USB device was even read, so
+  USB fell over at random ("USB malloc - incorrect magic number"), the pad or the VMX not set up, hot-plug dead.
+  The loaders now stop the card as nvnetdrv_stop does (`nic_stop`, both loaders reinstalled), and FOLD's
+  main_xbox.c stops it again first thing (`nic_quiesce`), with both USB controllers (`usb_quiesce`: nxdk resets
+  only the first, after setting up its memory). xemu never showed any of it.
+- nxdk's hub driver gave up on a hub for good after one port's status change failed (the interrupt-in transfer was
+  not submitted again): now it carries on.
+- nxdk freed a timed-out transfer (control and mass storage) that the controller could still write into: now kept.
+The nxdk changes are local (not in a repo of ours): `xbox/nxdk-local.patch` has them all, to re-apply on a fresh
+nxdk (`git apply` in ~/xboxdev/nxdk, the second part in lib/usb/libusbohci). nxdk's USB errors are kept in memory
+(`usbh_log`, the first 2 KB) instead of drawn over the picture, for the next time something needs a look.
+The VMX also answers as a ready disk from the moment it's plugged in (vmx-firmware esp32/src/mu.cpp).
+Not checked yet: frame rates; the dashboard's own view of the VMX; several VMXs on real hardware.
 
 ## The hologram's cost
 
