@@ -44,14 +44,17 @@ static struct {
   int tab, zone, sel[NTABS], t;                 // zone 0: the tab row, 1: the tab's content
   unsigned prev;
   int playing;                                  // PLAY: the pad drives the VMX
-  int dl, dlT; uint32_t dlId;                   // a download in progress (frames left)
+  int dl, dlT; uint32_t dlId, dlTo;             // a download in progress (frames left), to which VMX (serial; 0 = the hard disk)
+  int choose, chooseSel;                        // the VMX chooser open: 1 = which VMX World uses, 2 = where a download goes
   int applet, appSel;                           // an applet open (1 FOLD BUILDER, 2 CASHIER)
   int menu, menuSel;                            // MY VMX's menu for a game
   char toast[64]; int toastT;
   int gamesDirty;                               // the hard disk changed: the VMX re-reads its games before PLAY
-  uint32_t vmxMs;
+  uint32_t vmxMs, playSerial;                   // playSerial: the VMX PLAY is running (0 = the hard disk's)
+  int dlBytes;
 } W;
 static uint8_t *vxpData[MAXVXP]; static int nVxpData;
+static void storage_changed(void); static int count(int tab);
 static int haveHolo;                                    // the skeleton hologram's data loaded (assets/vmx_holo.bin)
 
 static void toast(const char *m) { snprintf(W.toast, sizeof W.toast, "%s", m); W.toastT = 75; }
@@ -96,8 +99,9 @@ static void background(void) {
 static void header(void) {
   gtext(40, 24, 3, 0xe8ffe8, "VMX"); gtext(40 + gfx_text5_w(3, "VMX "), 24, 3, HG, "WORLD");
   add_rect(40, 48, gfx_text5_w(3, "VMX WORLD"), 1, 0x1a5a28);
-  char b[64]; int blocks = 0; for (int i = 0; i < NINSTALLED; i++) blocks += (INSTALLED[i].bytes + 16383) / 16384;
-  snprintf(b, sizeof b, "%d GAMES ON %s  %d BLOCKS", NINSTALLED, hdd_on_vmx() ? "YOUR VMX" : "THE HARD DISK", blocks);
+  char b[96], l[40], w[40]; int sel = vmxlink_selected(); vmxlink_label(sel, l, sizeof l); vmxlink_where(sel, w, sizeof w);
+  if (sel >= 0) snprintf(b, sizeof b, "%s  %s  %d BLOCKS FREE", l, w, vmxlink_info(sel)->freeBlocks);
+  else snprintf(b, sizeof b, "%s  ON THE HARD DISK", l);
   gfx_disc(600 - gfx_text5_w(1, b) - 12, 33, 4, LIT); gfx_text5(600 - gfx_text5_w(1, b), 30, 1, INK, b);
 }
 static void tabs(void) {                                 // projected tabs: slanted outlines; the open one lit
@@ -121,6 +125,7 @@ static void hints(const char *a, const char *b, const char *y) {
   if (a) x += gfx_hint(x, Y, "A", a);
   if (b) x += gfx_hint(x, Y, "B", b);
   if (y) x += gfx_hint(x, Y, "Y", y);
+  if (!W.playing && vmxlink_count() && !W.choose) x += gfx_hint(x, Y, "X", "CHOOSE VMX");
   if (!W.playing) { x += gfx_hint(x, Y, "L R", "TABS"); gfx_hint(x, Y, "BACK START", "DASHBOARD"); }
 }
 // a list of rows (left panel); returns nothing; row(i, x, y, w, selected) draws one
@@ -180,8 +185,9 @@ static void draw_shop(void) {
   if (W.dl && W.dlId == v->id) {
     int p = 100 - W.dl * 100 / W.dlT; gfx_frame(292, 392, 300, 16, LIT); gfx_rect(294, 394, 296 * p / 100, 12, LIT);
     gfx_text5(292, 378, 1, INK, "DOWNLOADING...");
-  } else gfx_text5(292, 392, 1, have ? LIT : 0xffffff, have ? (hdd_on_vmx() ? "ON YOUR VMX" : "ON YOUR HARD DISK") : hdd_on_vmx() ? "A: DOWNLOAD TO YOUR VMX" : "A: DOWNLOAD TO THE HARD DISK");
-  hints(have ? NULL : "DOWNLOAD", "BACK", NULL);
+  } else if (vmxlink_count()) gfx_text5(292, 392, 1, 0xffffff, have ? "ON THIS VMX.  A: DOWNLOAD TO ANOTHER" : "A: DOWNLOAD (CHOOSE WHERE)");
+  else gfx_text5(292, 392, 1, have ? LIT : 0xffffff, have ? "ON YOUR HARD DISK" : "A: DOWNLOAD TO THE HARD DISK");
+  hints(have && !vmxlink_count() ? NULL : "DOWNLOAD", "BACK", NULL);
 }
 
 // ---- MY VMX
@@ -365,6 +371,34 @@ static void draw_applets(void) {
   hints("START", "BACK", NULL);
 }
 
+// ---- which VMX: the chooser (X, and when a download could go to more than one place)
+static int dev_of(uint32_t serial) { for (int i = 0; i < vmxlink_count(); i++) if (vmxlink_info(i)->sys.serial == serial) return i; return -1; }
+static void storage_changed(void) {                    // another VMX (or the hard disk): its games, saves and chips
+  hdd_scan(); vmx_reload(); load_scores();
+  for (int t = 0; t < NTABS; t++) if (W.sel[t] >= count(t)) W.sel[t] = count(t) ? count(t) - 1 : 0;
+}
+static void start_play(void) { W.playing = 1; W.playSerial = vmxlink_selected() >= 0 ? vmxlink_info(vmxlink_selected())->sys.serial : 0; }
+static void draw_chooser(void) {
+  int rows = vmxlink_count() + 1, h = 70 + rows * 36, x = 130, y = 240 - h / 2, w = 380;
+  gfx_dim(0, 0, 640, 480, 0.95f); hpanel(x, y, w, h, W.choose == 2 ? "DOWNLOAD TO" : "CHOOSE A VMX", HG);
+  for (int r = 0; r < rows; r++) {
+    int dev = r < vmxlink_count() ? r : -1, ry = y + 44 + r * 36, on = r == W.chooseSel;
+    char l[40], wh[40], b[80], t[10]; vmxlink_label(dev, l, sizeof l); vmxlink_where(dev, wh, sizeof wh);
+    const VmxInfo *v = vmxlink_info(dev);
+    int bad = W.choose == 2 && (hdd_has_game(dev, W.dlId) || !hdd_room(dev, W.dlBytes));
+    if (on) hsel(x + 10, ry - 4, w - 20, 32, 1);
+    gfx_text5(x + 22, ry, 1, bad ? MUTED : on ? 0xffffff : INK, l);
+    if (v) { vol_serial_text(v->sys.serial, t); gfx_text5(x + w - 22 - gfx_text5_w(1, t), ry, 1, MUTED, t);
+             snprintf(b, sizeof b, "%s  %d GAME%s  %d BLOCKS FREE", wh, v->games, v->games == 1 ? "" : "S", v->freeBlocks); }
+    else { int g = hdd_games_on(-1); snprintf(b, sizeof b, "%s  %d GAME%s", wh, g, g == 1 ? "" : "S"); }
+    if (W.choose == 2 && hdd_has_game(dev, W.dlId)) snprintf(b, sizeof b, "%s  ALREADY HAS IT", wh);
+    else if (W.choose == 2 && !hdd_room(dev, W.dlBytes)) snprintf(b, sizeof b, "%s  NOT ENOUGH ROOM", wh);
+    gfx_text5(x + 22, ry + 12, 1, MUTED, b);
+    if (dev == vmxlink_selected() && W.choose == 1) gfx_text5(x + w - 22 - gfx_text5_w(1, "IN USE"), ry + 12, 1, HG, "IN USE");
+  }
+  hints(W.choose == 2 ? "DOWNLOAD HERE" : "USE THIS ONE", "CANCEL", NULL);
+}
+
 // ---- app.h
 void app_init(const char *levelsDir) {
   (void)levelsDir;
@@ -397,14 +431,21 @@ void app_frame(const Pad *pad) {
   if (pad->lx < -0.6f) held |= PAD_LEFT; if (pad->lx > 0.6f) held |= PAD_RIGHT;
   unsigned e = held & ~W.prev; W.prev = held; W.t++;
   holo_prepare();                                     // the hologram's pictures, one a tick until ready
-  if (vmxlink_poll()) {                               // a VMX came or went: its games, saves and chips are World's now
-    W.playing = W.menu = 0; hdd_scan(); vmx_reload(); load_scores();
-    for (int t = 0; t < NTABS; t++) if (W.sel[t] >= count(t)) W.sel[t] = count(t) ? count(t) - 1 : 0;
-    toast(hdd_on_vmx() ? "VMX PLUGGED IN" : vmxlink_other() ? "THAT MEMORY UNIT ISN'T A VMX" : "VMX UNPLUGGED");
+  if (vmxlink_poll()) {                               // a VMX came or went
+    int was = W.playing; uint32_t serial = W.playSerial;
+    if (W.playing && (vmxlink_selected() < 0 ? 0 : vmxlink_info(vmxlink_selected())->sys.serial) != serial) W.playing = 0;   // its VMX went
+    if (!W.playing) { W.menu = 0; W.choose = 0; storage_changed(); } else (void)was;
+    toast(vmxlink_event());
   }
   if (W.toastT) W.toastT--;
-  if (W.dl && --W.dl == 0) {                           // a download finished: on to the hard disk
-    for (int i = 0; i < NCATALOG; i++) if (CATALOG[i].id == W.dlId) { if (hdd_install(&CATALOG[i])) { toast("DOWNLOADED"); W.gamesDirty = 1; } else toast(hdd_on_vmx() ? "COULDN'T WRITE YOUR VMX" : "COULDN'T WRITE THE HARD DISK"); }
+  if (W.dl && --W.dl == 0) {                           // a download finished: onto the VMX it was meant for
+    int to = dev_of(W.dlTo), was = vmxlink_selected(); char l[40]; vmxlink_label(to, l, sizeof l);
+    if (W.dlTo && to < 0) toast("THAT VMX WAS UNPLUGGED");
+    else for (int i = 0; i < NCATALOG; i++) if (CATALOG[i].id == W.dlId) {
+      vmxlink_select(to); int ok = hdd_install(&CATALOG[i]); vmxlink_refresh(); vmxlink_select(was); hdd_scan();
+      char b[64]; snprintf(b, sizeof b, ok ? "DOWNLOADED TO %s" : "COULDN'T WRITE %s", l); toast(b);
+      if (to == was) W.gamesDirty = 1;
+    }
   }
   if (W.playing) {                                     // the VMX has the pad; Y gives it back to World
     int b = 0;
@@ -412,6 +453,20 @@ void app_frame(const Pad *pad) {
     if (held & PAD_A) b |= B_A; if (held & PAD_B) b |= B_B; if (held & PAD_BACK) b |= B_SIDE;
     W.vmxMs += 33; vmx_frame(W.vmxMs, b);
     if (e & PAD_Y) { W.playing = 0; load_scores(); }
+    return;
+  }
+  if (W.choose) {                                      // the VMX chooser: the VMXs, then the hard disk
+    int rows = vmxlink_count() + 1;
+    if (e & PAD_UP) W.chooseSel = (W.chooseSel + rows - 1) % rows;
+    if (e & PAD_DOWN) W.chooseSel = (W.chooseSel + 1) % rows;
+    if (e & (PAD_B | PAD_X)) W.choose = 0;
+    if (e & PAD_A) {
+      int dev = W.chooseSel < vmxlink_count() ? W.chooseSel : -1;
+      if (W.choose == 1) { W.choose = 0; if (dev != vmxlink_selected()) { vmxlink_select(dev); storage_changed(); char l[40], b[64]; vmxlink_label(dev, l, sizeof l); snprintf(b, sizeof b, "USING %s", l); toast(b); } }
+      else if (!hdd_has_game(dev, W.dlId) && hdd_room(dev, W.dlBytes)) {
+        W.choose = 0; W.dlTo = dev >= 0 ? vmxlink_info(dev)->sys.serial : 0; W.dlT = W.dl = 30 + W.dlBytes / 1200;
+      }
+    }
     return;
   }
   if (W.applet == 2) {
@@ -425,11 +480,12 @@ void app_frame(const Pad *pad) {
     if (e & PAD_B) W.menu = 0;
     if (e & PAD_A) {
       W.menu = 0;
-      if (W.menuSel == 0) { W.tab = T_PLAY; W.sel[T_PLAY] = W.sel[T_MINE]; if (W.gamesDirty) vmx_reload(); W.playing = 1; }
-      else if (hdd_remove(INSTALLED[W.sel[T_MINE]].id)) { toast("DELETED"); W.gamesDirty = 1; if (W.sel[T_MINE] >= NINSTALLED && W.sel[T_MINE]) W.sel[T_MINE]--; }
+      if (W.menuSel == 0) { W.tab = T_PLAY; W.sel[T_PLAY] = W.sel[T_MINE]; if (W.gamesDirty) vmx_reload(); start_play(); }
+      else if (hdd_remove(INSTALLED[W.sel[T_MINE]].id)) { vmxlink_refresh(); toast("DELETED"); W.gamesDirty = 1; if (W.sel[T_MINE] >= NINSTALLED && W.sel[T_MINE]) W.sel[T_MINE]--; }
     }
     return;
   }
+  if ((e & PAD_X) && vmxlink_count()) { W.choose = 1; W.chooseSel = vmxlink_selected() >= 0 ? vmxlink_selected() : vmxlink_count(); return; }
   if (e & (PAD_L | PAD_WHITE)) { W.tab = (W.tab + NTABS - 1) % NTABS; W.zone = 0; }
   if (e & (PAD_R | PAD_BLACK)) { W.tab = (W.tab + 1) % NTABS; W.zone = 0; }
   if (W.zone == 0) {
@@ -445,10 +501,14 @@ void app_frame(const Pad *pad) {
   if (!(e & PAD_A)) return;
   switch (W.tab) {
     case T_SHOP:
-      if (n && hdd_installed(CATALOG[*s].id) < 0 && !W.dl) { W.dlId = CATALOG[*s].id; W.dlT = W.dl = 30 + CATALOG[*s].bytes / 1200; }
+      if (n && !W.dl) {                                 // where to: asked when there's more than one place
+        W.dlId = CATALOG[*s].id; W.dlBytes = CATALOG[*s].bytes;
+        if (vmxlink_count()) { W.choose = 2; W.chooseSel = vmxlink_selected() >= 0 ? vmxlink_selected() : vmxlink_count(); }
+        else if (hdd_installed(W.dlId) < 0) { W.dlTo = 0; W.dlT = W.dl = 30 + W.dlBytes / 1200; }
+      }
       break;
     case T_MINE: if (n) { W.menu = 1; W.menuSel = 0; } break;
-    case T_PLAY: if (W.gamesDirty) vmx_reload(); W.playing = 1; break;
+    case T_PLAY: if (W.gamesDirty) vmx_reload(); start_play(); break;
     case T_APPLETS:
       if (*s == 1) { W.applet = 2; W.appSel = 0; load_scores(); }
       else if (FOLD_XBE) {
@@ -467,6 +527,7 @@ void app_draw(void) {
     case T_NEWS: draw_news(); break; case T_SHOP: draw_shop(); break; case T_MINE: draw_mine(); break;
     case T_PLAY: draw_play(); break; case T_SCORES: draw_scores(); break; case T_APPLETS: draw_applets(); break;
   }
+  if (W.choose) draw_chooser();
   if (W.toastT) { int w = gfx_text5_w(1, W.toast) + 28, x = 330 - w / 2; glass(x, 22, w, 22); brackets(x, 22, w, 22, HG, 6); gtext(x + 14, 29, 1, HG, W.toast); }
   post(W.t);
 }

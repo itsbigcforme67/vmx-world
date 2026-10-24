@@ -153,6 +153,19 @@ int hdd_install(const Vxp *v) {   // (into the game's save folder: its save, if 
   snprintf(p, sizeof p, "%s" SEP "SaveMeta.xbx", dir); ok = ok && write_meta(p, "Name", v->title);
   hdd_scan(); return ok;
 }
+int hdd_has_game(int dev, uint32_t id) {
+  char p[60];
+  if (dev >= 0) { Fatx *v = vmxlink_vol_of(dev); vol_game_path(id, p); return v && fatx_size(v, p) > 0; }
+  snprintf(p, sizeof p, WORLD "%08X0000" SEP "GAME.VXP", (unsigned)id); return hdd_exists(p);
+}
+int hdd_room(int dev, int bytes) { const VmxInfo *v = vmxlink_info(dev); return !v || v->freeBlocks >= (bytes + 16383) / 16384 + 3; }   // + folder, SaveMeta, a save
+static void game_entry(const char *dir, const char *name, int isDir, void *u) {
+  char p[300]; snprintf(p, sizeof p, "%s%s" SEP "GAME.VXP", dir, name); if (isDir && hdd_exists(p)) (*(int *)u)++;
+}
+int hdd_games_on(int dev) {
+  if (dev >= 0) { const VmxInfo *v = vmxlink_info(dev); return v ? v->games : 0; }
+  int k = 0; each_entry(WORLD, game_entry, &k); return k;
+}
 static void rm_entry(const char *dir, const char *name, int isDir, void *u) {
   char p[300]; snprintf(p, sizeof p, "%s%s", dir, name);
   if (!isDir) remove(p);

@@ -1,0 +1,18 @@
+# xemu with two VMX images in controller 1's slots (tools/run_xemu.sh --mu A --mu2 B): the chooser, then a download
+# onto the second VMX (World plays this from D:\demo.txt)
+wait 200
+X
+wait 60
+DOWN
+A
+wait 30
+R
+A
+wait 2
+A
+wait 30
+DOWN
+A
+wait 200
+X
+wait 600

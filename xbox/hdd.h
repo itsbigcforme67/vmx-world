@@ -21,6 +21,9 @@ void hdd_scan(void);                                 // re-reads CATALOG and INS
 int  hdd_installed(uint32_t id);                     // index in INSTALLED or -1
 int  hdd_on_vmx(void);                                // 1 = a VMX is plugged in: INSTALLED, installs and saves are on it
 int  hdd_install(const Vxp *v);                      // copies a catalogue game to the VMX, or the hard disk; 1 = ok
+int  hdd_has_game(int dev, uint32_t id);              // is that game on VMX dev (vmxlink.h; -1 = the hard disk)
+int  hdd_room(int dev, int bytes);                    // room on it for a game that size (and its folder)
+int  hdd_games_on(int dev);
 int  hdd_remove(uint32_t id);                        // deletes its save folder; 1 = ok
 uint8_t *hdd_read(const char *path, int *len);       // a whole file (malloc), or NULL
 int  hdd_exists(const char *path);

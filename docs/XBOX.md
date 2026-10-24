@@ -14,7 +14,13 @@ Xbox for real"). The look follows `mockup/world.html`; everything in it is real 
   registers nxdk's mass-storage driver before SDL starts USB (`app_usb_init`) and reads the VMX's FATX volume with
   vmx-firmware/core/fatx.c. A memory unit with `56580001\VMX.SYS` on it is a VMX: while it's plugged in, MY VMX, PLAY,
   GET GAMES' downloads and SCORES (records, casino chips) all use the VMX; unplugged, World's own copy on the hard disk.
-  Plugging and unplugging is noticed while World runs ("VMX PLUGGED IN"). Another memory unit: "isn't a VMX".
+  Plugging and unplugging is noticed while World runs ("JAM'S VMX PLUGGED IN"). Another memory unit: "isn't a VMX".
+- **Several VMXs** (up to 8: 4 controllers x 2 slots): each is told apart by its serial and owner's name (VMX.SYS),
+  listed by controller and slot (hub port 2 = slot A, 3 = slot B; the controller from the console's hub port, as
+  nxdk's SDL pad driver maps it). The first to arrive is the one World uses; X opens CHOOSE A VMX (each VMX, then
+  World's own on the hard disk, with games and blocks free). A download asks DOWNLOAD TO when there's more than one
+  place, greying out where it already is or won't fit; the game goes there without changing which VMX World uses.
+  If the VMX in use is unplugged World moves to the next one (PLAY stops only if its VMX went).
 - **PLAY**: the real VMX on the TV, as a turning skeleton hologram (xbox/holo.c; DESIGN.md "The look on the Xbox
 side"): the VMX firmware's hardware-free core (vmx-firmware/core) with the .NET runtime
   (vmx-firmware/runtime/vxrt.c) running every game on the hard disk, inside the owner's VMX render. The pad is the
@@ -51,7 +57,8 @@ microgames/fold (renderer, platform layer, GPU, pad scripts) and vmx-firmware (c
 Never `make clean` in xbox/ (nxdk's clean deletes its shared libraries). The VMX games come from
 vmx-firmware/build/games (build them there first).
 
-    tools/run_xemu.sh --mu vmx.img ...        # a memory unit image in controller 1 (xemu's keyboard pad)
+    tools/run_xemu.sh --mu vmx.img ...        # a memory unit image in controller 1 (xemu's keyboard pad); --mu2: slot B
+    tools/build_xbox.sh DEMO=tests/xemu_vmx2.txt   # with two: the chooser, a download onto the other VMX
     tools/build_xbox.sh DEMO=tests/xemu_vmx.txt   # then: World lists the VMX's games and downloads one onto it
     tools/kernel_fatx_test.sh                 # the Xbox kernel's FATX driver against our FATX code (PASS)
 
