@@ -4,8 +4,8 @@
 FOLD = ../../microgames/fold
 FW = ../../vmx-firmware
 SRC = world.c hdd.c holo.c vmxlink.c $(FW)/core/fatx.c $(FW)/core/vmxvol.c $(FOLD)/app/gfx.c $(FOLD)/app/main_headless.c \
-      $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c $(FW)/core/game_fold.c \
-      $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c $(FOLD)/core/fold.c $(FOLD)/app/vmx.c
+      $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c \
+      $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c
 CFLAGS = -O2 -Wall -Wno-unused-parameter -Wno-misleading-indentation -std=gnu11
 build/world_headless: $(SRC) *.h $(FW)/core/*.h disc
 	mkdir -p build

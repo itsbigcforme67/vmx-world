@@ -9,8 +9,8 @@ XBE_TITLE = VMX_World
 FOLD = ../../microgames/fold
 FW = ../../vmx-firmware
 SRCS = world.c hdd.c holo.c vmxlink.c $(FW)/core/fatx.c $(FW)/core/vmxvol.c $(FOLD)/app/gfx.c $(FOLD)/app/main_xbox.c $(FOLD)/app/padscript.c $(FOLD)/xbox/gpu.c \
-       $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c $(FW)/core/game_fold.c \
-       $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c $(FOLD)/core/fold.c $(FOLD)/app/vmx.c
+       $(FW)/core/ui.c $(FW)/core/surf.c $(FW)/core/sound.c $(FW)/core/records.c $(FW)/core/games.c \
+       $(FW)/core/game_vx.c $(FW)/runtime/vxrt.c
 CFLAGS += -O2 -include $(FOLD)/xbox/xbox_compat.h -include nxdk_compat.h -DNXDK -Wno-misleading-indentation
 LDFLAGS += -stack:0x40000
 NXDK_SDL = y
